@@ -23,48 +23,37 @@ import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
 import com.mazhar.socialconnect.ui.theme.*
 
-data class Post(
-    val id: String,
-    val userName: String,
-    val timeAgo: String,
-    val content: String,
-    val imageUrl: String? = null,
-    val likes: Int,
-    val comments: Int
-)
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mazhar.socialconnect.data.model.Post
+import com.mazhar.socialconnect.ui.components.PostCard
+import com.google.firebase.auth.FirebaseAuth
+import com.mazhar.socialconnect.ui.components.PostCardSkeleton
+import com.mazhar.socialconnect.ui.components.HomeHeaderSkeleton
 
 @Composable
 fun HomeScreen(
     onNavigateToProfile: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToCreatePost: (String?) -> Unit,
+    viewModel: HomeViewModel = viewModel()
 ) {
-    val mockPosts = listOf(
-        Post(
-            id = "1",
-            userName = "Sara Ahmed",
-            timeAgo = "about 1 hour ago",
-            content = "Just finished my new project! Super excited to share it with everyone. \uD83D\uDE80",
-            likes = 42,
-            comments = 1
-        ),
-        Post(
-            id = "2",
-            userName = "Zainab Noor",
-            timeAgo = "about 2 hours ago",
-            content = "What a beautiful evening in the city today.",
-            imageUrl = "https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0",
-            likes = 120,
-            comments = 0
-        )
-    )
+    val posts by viewModel.posts.collectAsState()
+    val loading by viewModel.loading.collectAsState()
+    val currentUserData by viewModel.currentUserData.collectAsState()
+    
+    val auth = FirebaseAuth.getInstance()
+    val currentUserId = auth.currentUser?.uid ?: ""
 
     Scaffold(
         bottomBar = {
             CustomBottomNavigationBar(
                 onHomeClick = {},
-                onEditClick = {},
+                onEditClick = { onNavigateToCreatePost(null) },
                 onProfileClick = onNavigateToProfile,
-                onSettingsClick = onNavigateToSettings
+                onSettingsClick = onNavigateToSettings,
+                selectedRoute = "home"
             )
         },
         containerColor = BackgroundLight
@@ -76,18 +65,44 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             item {
-                HomeHeader()
+                if (currentUserData == null && loading) {
+                    HomeHeaderSkeleton()
+                } else {
+                    HomeHeader(currentUserData?.name ?: "User", currentUserData?.profilePictureUrl)
+                }
             }
-            items(mockPosts) { post ->
-                PostCard(post)
-                Spacer(modifier = Modifier.height(16.dp))
+            
+            if (loading && posts.isEmpty()) {
+                items(5) {
+                    PostCardSkeleton()
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            } else if (posts.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No posts yet. Be the first to post!", color = TextGray)
+                    }
+                }
+            } else {
+                items(posts) { post ->
+                    PostCard(
+                        post = post,
+                        currentUserId = currentUserId,
+                        onLikeClick = { viewModel.likePost(post) },
+                        onCommentClick = { /* Handle comment */ },
+                        onShareClick = { /* Handle share */ },
+                        onEditClick = { onNavigateToCreatePost(post.id) },
+                        onDeleteClick = { viewModel.deletePost(post.id) }
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
         }
     }
 }
 
 @Composable
-fun HomeHeader() {
+fun HomeHeader(userName: String, profileImageUrl: String?) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -103,15 +118,26 @@ fun HomeHeader() {
         ) {
             Column {
                 Text("Good morning,", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
-                Text("Ali", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text(userName, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
-            // Mock profile image
+            // User profile image
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(Color.LightGray)
-            )
+            ) {
+                if (profileImageUrl != null) {
+                    Image(
+                        painter = rememberAsyncImagePainter(profileImageUrl),
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.align(Alignment.Center))
+                }
+            }
         }
     }
     Spacer(modifier = Modifier.height(24.dp))
@@ -138,11 +164,20 @@ fun PostCard(post: Post) {
                         .size(40.dp)
                         .clip(CircleShape)
                         .background(Color.Gray)
-                )
+                ) {
+                    if (post.userProfilePicture.isNotEmpty()) {
+                        Image(
+                            painter = rememberAsyncImagePainter(post.userProfilePicture),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(post.userName, fontWeight = FontWeight.Bold, color = TextDark)
-                    Text(post.timeAgo, color = TextGray, fontSize = 12.sp)
+                    Text(formatTimestamp(post.timestamp), color = TextGray, fontSize = 12.sp)
                 }
                 Icon(Icons.Default.MoreVert, contentDescription = "More", tint = TextGray)
             }
@@ -157,7 +192,7 @@ fun PostCard(post: Post) {
                     contentDescription = "Post image",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
+                        .height(250.dp)
                         .clip(RoundedCornerShape(16.dp)),
                     contentScale = ContentScale.Crop
                 )
@@ -166,15 +201,30 @@ fun PostCard(post: Post) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ChipIconValue(icon = Icons.Default.LocalFireDepartment, value = post.likes.toString(), tint = OrangeAccent, bg = Color(0xFFFFF0E6))
+                ChipIconValue(icon = Icons.Default.LocalFireDepartment, value = post.likesCount.toString(), tint = OrangeAccent, bg = Color(0xFFFFF0E6))
                 Spacer(modifier = Modifier.width(12.dp))
-                ChipIconValue(icon = Icons.Default.ChatBubbleOutline, value = post.comments.toString(), tint = TextGray, bg = Color.Transparent, isOutlined = true)
+                ChipIconValue(icon = Icons.Default.ChatBubbleOutline, value = post.commentsCount.toString(), tint = TextGray, bg = Color.Transparent, isOutlined = true)
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(onClick = { /* Share */ }, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.IosShare, contentDescription = "Share", tint = TextGray)
                 }
             }
         }
+    }
+}
+
+fun formatTimestamp(timestamp: Long): String {
+    val diff = System.currentTimeMillis() - timestamp
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+
+    return when {
+        days > 0 -> "$days days ago"
+        hours > 0 -> "$hours hours ago"
+        minutes > 0 -> "$minutes minutes ago"
+        else -> "Just now"
     }
 }
 
