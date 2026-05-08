@@ -26,6 +26,8 @@ import com.mazhar.socialconnect.ui.theme.*
 fun PostCard(
     post: Post,
     currentUserId: String,
+    isFollowing: Boolean = false,
+    onFollowClick: () -> Unit = {},
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
     onShareClick: () -> Unit,
@@ -69,6 +71,21 @@ fun PostCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(post.userName, fontWeight = FontWeight.Bold, color = TextDark)
                     Text(formatTimestamp(post.timestamp), color = TextGray, fontSize = 12.sp)
+                }
+                
+                if (!isOwnPost) {
+                    TextButton(
+                        onClick = onFollowClick,
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = if (isFollowing) "Following" else "Follow",
+                            color = if (isFollowing) TextGray else PrimaryPurple,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
                 
                 Box {

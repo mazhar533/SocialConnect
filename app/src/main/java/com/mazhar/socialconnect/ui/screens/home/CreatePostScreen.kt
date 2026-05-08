@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.mazhar.socialconnect.ui.theme.*
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,7 +59,7 @@ fun CreatePostScreen(
         postToEdit?.let {
             content = it.content
             if (it.imageUrl != null) {
-                selectedImageUri = Uri.parse(it.imageUrl)
+                selectedImageUri = it.imageUrl.toUri()
             }
         }
     }

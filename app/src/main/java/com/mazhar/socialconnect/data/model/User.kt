@@ -8,5 +8,7 @@ data class User(
     val profilePictureUrl: String = "",
     val postsCount: Int = 0,
     val followersCount: Int = 0,
-    val followingCount: Int = 0
+    val followingCount: Int = 0,
+    val followers: List<String> = emptyList(),
+    val following: List<String> = emptyList()
 )

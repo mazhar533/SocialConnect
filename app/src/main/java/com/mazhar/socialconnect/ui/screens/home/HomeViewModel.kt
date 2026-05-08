@@ -103,4 +103,62 @@ class HomeViewModel : ViewModel() {
             // Handle error
         }
     }
+
+    fun toggleFollow(targetUserId: String) = viewModelScope.launch {
+        val currentUserId = auth.currentUser?.uid ?: return@launch
+        if (currentUserId == targetUserId) return@launch
+
+        // Optimistic UI Update
+        val currentUserVal = _currentUserData.value
+        if (currentUserVal != null) {
+            val isCurrentlyFollowing = currentUserVal.following.contains(targetUserId)
+            val newFollowing = if (isCurrentlyFollowing) {
+                currentUserVal.following - targetUserId
+            } else {
+                currentUserVal.following + targetUserId
+            }
+            _currentUserData.value = currentUserVal.copy(
+                following = newFollowing,
+                followingCount = newFollowing.size
+            )
+        }
+
+        try {
+            val currentUserRef = firestore.collection("users").document(currentUserId)
+            val targetUserRef = firestore.collection("users").document(targetUserId)
+
+            firestore.runTransaction { transaction ->
+                val currentUserSnapshot = transaction.get(currentUserRef)
+                val targetUserSnapshot = transaction.get(targetUserRef)
+
+                val currentUser = currentUserSnapshot.toObject(User::class.java) ?: return@runTransaction
+                val targetUser = targetUserSnapshot.toObject(User::class.java) ?: return@runTransaction
+
+                val isFollowing = currentUser.following.contains(targetUserId)
+
+                val newFollowing = if (isFollowing) {
+                    currentUser.following - targetUserId
+                } else {
+                    currentUser.following + targetUserId
+                }
+
+                val newFollowers = if (isFollowing) {
+                    targetUser.followers - currentUserId
+                } else {
+                    targetUser.followers + currentUserId
+                }
+
+                transaction.update(currentUserRef, "following", newFollowing)
+                transaction.update(currentUserRef, "followingCount", newFollowing.size)
+
+                transaction.update(targetUserRef, "followers", newFollowers)
+                transaction.update(targetUserRef, "followersCount", newFollowers.size)
+            }.await()
+
+            // Refresh user data to get updated following list
+            fetchCurrentUserData()
+        } catch (e: Exception) {
+            // Handle error
+        }
+    }
 }

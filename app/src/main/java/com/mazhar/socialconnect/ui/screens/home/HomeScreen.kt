@@ -85,9 +85,12 @@ fun HomeScreen(
                 }
             } else {
                 items(posts) { post ->
+                    val isFollowing = currentUserData?.following?.contains(post.userId) == true
                     PostCard(
                         post = post,
                         currentUserId = currentUserId,
+                        isFollowing = isFollowing,
+                        onFollowClick = { viewModel.toggleFollow(post.userId) },
                         onLikeClick = { viewModel.likePost(post) },
                         onCommentClick = { /* Handle comment */ },
                         onShareClick = { /* Handle share */ },
@@ -256,17 +259,15 @@ fun CustomBottomNavigationBar(
     selectedRoute: String = "home"
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(24.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .height(72.dp)
+                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 .background(PrimaryPurple)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
