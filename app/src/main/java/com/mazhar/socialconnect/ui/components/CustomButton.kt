@@ -12,8 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mazhar.socialconnect.ui.theme.OrangeAccent
-import com.mazhar.socialconnect.ui.theme.PrimaryPurple
+import androidx.compose.material3.MaterialTheme
 
 @Composable
 fun CustomButton(
@@ -26,8 +25,8 @@ fun CustomButton(
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isPrimary) OrangeAccent else PrimaryPurple,
-            contentColor = Color.White
+            containerColor = if (isPrimary) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
         ),
         shape = RoundedCornerShape(16.dp),
         enabled = enabled,

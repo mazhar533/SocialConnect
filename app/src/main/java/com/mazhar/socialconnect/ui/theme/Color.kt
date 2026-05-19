@@ -12,3 +12,11 @@ val TextDark = Color(0xFF161530)
 val TextGray = Color(0xFF8C8CA1)
 val TextFieldBg = Color(0xFFF9F9FA)
 val BorderColor = Color(0xFFF0F0F3)
+
+// Dark Mode Colors
+val BackgroundDark = Color(0xFF050914)
+val CardBackgroundDark = Color(0xFF151B2B)
+val TextLight = Color(0xFFFFFFFF)
+val TextGrayDark = Color(0xFFA0A5B1)
+val TextFieldBgDark = Color(0xFF0A0E17)
+val BorderColorDark = Color(0xFF2A3249)

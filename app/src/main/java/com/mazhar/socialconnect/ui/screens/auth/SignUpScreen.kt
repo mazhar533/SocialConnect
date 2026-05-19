@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,7 +62,10 @@ fun SignUpScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
+                    colors = if (isSystemInDarkTheme()) listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.background
+                    ) else listOf(
                         Color(0xFFE2EAFC),
                         Color(0xFFF9DDD6)
                     )
@@ -73,7 +77,7 @@ fun SignUpScreen(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .padding(vertical = 24.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(32.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -88,7 +92,7 @@ fun SignUpScreen(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(OrangeAccent),
+                        .background(MaterialTheme.colorScheme.secondary),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -102,10 +106,10 @@ fun SignUpScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Join the Vibe",
+                    text = "Join SocialConnect",
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextDark
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -113,7 +117,7 @@ fun SignUpScreen(
                 Text(
                     text = "Discover what's happening\nright now.",
                     fontSize = 14.sp,
-                    color = TextGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
 
@@ -162,7 +166,7 @@ fun SignUpScreen(
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextDark),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
                     border = null,
                     contentPadding = PaddingValues(0.dp)
                 ) {
@@ -170,14 +174,14 @@ fun SignUpScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(
-                                color = TextFieldBg,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 shape = RoundedCornerShape(16.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Row {
-                            Text(text = "Already a member? ", color = TextGray)
-                            Text(text = "Log in", color = OrangeAccent, fontWeight = FontWeight.Bold)
+                            Text(text = "Already a member? ", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = "Log in", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

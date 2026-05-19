@@ -10,5 +10,6 @@ data class User(
     val followersCount: Int = 0,
     val followingCount: Int = 0,
     val followers: List<String> = emptyList(),
-    val following: List<String> = emptyList()
+    val following: List<String> = emptyList(),
+    val fcmToken: String = ""
 )

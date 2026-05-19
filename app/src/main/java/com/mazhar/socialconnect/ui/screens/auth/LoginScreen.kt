@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,7 +61,10 @@ fun LoginScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
+                    colors = if (isSystemInDarkTheme()) listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.background
+                    ) else listOf(
                         Color(0xFFE2EAFC),
                         Color(0xFFF9DDD6)
                     )
@@ -72,7 +76,7 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .padding(vertical = 24.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(32.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -87,13 +91,13 @@ fun LoginScreen(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(PrimaryPurpleSoft),
+                        .background(MaterialTheme.colorScheme.tertiary),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Explore,
                         contentDescription = "Logo",
-                        tint = OrangeAccent,
+                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(40.dp)
                     )
                 }
@@ -101,10 +105,10 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "VibeConnect",
+                    text = "SocialConnect",
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextDark
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -112,7 +116,7 @@ fun LoginScreen(
                 Text(
                     text = "Your tribe is waiting.\nDive back in!",
                     fontSize = 14.sp,
-                    color = TextGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
 
@@ -139,7 +143,7 @@ fun LoginScreen(
 
                 Text(
                     text = "Forgot password?",
-                    color = PrimaryPurpleSoft,
+                    color = MaterialTheme.colorScheme.secondary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
@@ -164,7 +168,7 @@ fun LoginScreen(
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextDark),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
                     border = null,
                     contentPadding = PaddingValues(0.dp)
                 ) {
@@ -172,14 +176,14 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(
-                                color = TextFieldBg,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 shape = RoundedCornerShape(16.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "New here? Create an account",
-                            color = PrimaryPurpleSoft,
+                            color = MaterialTheme.colorScheme.secondary,
                             fontWeight = FontWeight.Bold
                         )
                     }

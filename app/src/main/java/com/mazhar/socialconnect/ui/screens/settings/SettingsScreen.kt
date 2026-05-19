@@ -19,13 +19,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mazhar.socialconnect.ui.screens.home.CustomBottomNavigationBar
-import com.mazhar.socialconnect.ui.theme.*
+import com.mazhar.socialconnect.data.FcmNotificationSender
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import android.widget.Toast
 
 @Composable
 fun SettingsScreen(
@@ -45,38 +52,52 @@ fun SettingsScreen(
 
     Scaffold(
         topBar = {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 48.dp, bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                    .background(MaterialTheme.colorScheme.primary)
             ) {
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier.background(BorderColor, CircleShape).size(40.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = PrimaryPurple)
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f), CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack, 
+                            contentDescription = "Back", 
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "SocialConnect",
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontSize = 18.sp,
+                            fontFamily = FontFamily.Cursive,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Preferences",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = "Preferences",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextDark
-                )
             }
         },
-        bottomBar = {
-            CustomBottomNavigationBar(
-                onHomeClick = onNavigateToHome,
-                onEditClick = { onNavigateToCreatePost(null) },
-                onProfileClick = onNavigateToProfile,
-                onSettingsClick = {}, // We are here
-                selectedRoute = "settings"
-            )
-        },
-        containerColor = BackgroundLight
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -84,21 +105,21 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 24.dp)
         ) {
-            HorizontalDivider(Modifier, DividerDefaults.Thickness, color = BorderColor)
+            HorizontalDivider(Modifier, DividerDefaults.Thickness, color = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.height(24.dp))
             
-            Text("ACCOUNT CONTROL", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryPurpleSoft, letterSpacing = 1.sp)
+            Text("ACCOUNT CONTROL", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary, letterSpacing = 1.sp)
             Spacer(modifier = Modifier.height(16.dp))
             
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBackground),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     SettingItem(
                         icon = Icons.Outlined.Notifications,
-                        iconTint = OrangeAccent,
+                        iconTint = MaterialTheme.colorScheme.secondary,
                         title = "Notifications",
                         subtitle = "Push, email, SMS alerts",
                         checked = notificationsEnabled,
@@ -107,7 +128,7 @@ fun SettingsScreen(
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 24.dp),
                         thickness = DividerDefaults.Thickness,
-                        color = BorderColor
+                        color = MaterialTheme.colorScheme.outline
                     )
                     SettingItem(
                         icon = Icons.Outlined.Lock,
@@ -120,7 +141,7 @@ fun SettingsScreen(
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 24.dp),
                         thickness = DividerDefaults.Thickness,
-                        color = BorderColor
+                        color = MaterialTheme.colorScheme.outline
                     )
                     SettingItem(
                         icon = Icons.Outlined.Security,
@@ -135,17 +156,17 @@ fun SettingsScreen(
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            Text("APP EXPERIENCE", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryPurpleSoft, letterSpacing = 1.sp)
+            Text("APP EXPERIENCE", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary, letterSpacing = 1.sp)
             Spacer(modifier = Modifier.height(16.dp))
             
             Card(
-                colors = CardDefaults.cardColors(containerColor = CardBackground),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 SettingItem(
                     icon = Icons.Outlined.ModeNight,
-                    iconTint = PrimaryPurpleSoft,
+                    iconTint = MaterialTheme.colorScheme.tertiary,
                     title = "Dark Mode",
                     subtitle = "Soothe your eyes",
                     checked = darkModeEnabled,
@@ -173,11 +194,10 @@ fun SettingsScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.height(24.dp))
             Text(
-                "VIBECONNECT v2.0",
+                "SOCIALCONNECT v2.0",
                 fontSize = 10.sp,
-                color = TextGray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -204,24 +224,24 @@ fun SettingItem(
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(TextFieldBg, CircleShape),
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, contentDescription = title, tint = iconTint)
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextDark)
-            Text(subtitle, fontSize = 12.sp, color = TextGray)
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+            Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = PrimaryPurpleSoft,
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = BorderColor,
+                checkedThumbColor = Color(0xFFE65100), // Deep/Dark Orange
+                checkedTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f),
+                uncheckedThumbColor = MaterialTheme.colorScheme.surface,
+                uncheckedTrackColor = MaterialTheme.colorScheme.outline,
                 uncheckedBorderColor = Color.Transparent
             )
         )

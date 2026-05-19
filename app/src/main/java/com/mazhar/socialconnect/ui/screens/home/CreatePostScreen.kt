@@ -87,52 +87,68 @@ fun CreatePostScreen(
 
     Scaffold(
         topBar = {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 48.dp, bottom = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                    .background(MaterialTheme.colorScheme.primary)
             ) {
-                IconButton(
-                    onClick = onNavigateBack,
+                Row(
                     modifier = Modifier
-                        .shadow(4.dp, CircleShape)
-                        .background(Color.White, CircleShape)
-                        .size(40.dp)
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextDark)
-                }
-                
-                Text(
-                    text = if (postId == null) "New Story" else "Edit Story",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextDark
-                )
-                
-                Button(
-                    onClick = { viewModel.createPost(content, selectedImageUri, postId) },
-                    enabled = (content.isNotBlank() || selectedImageUri != null) && !loading,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurpleSoft),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.height(40.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp)
-                ) {
-                    if (loading) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.EditNote, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (postId == null) "Publish" else "Save", fontWeight = FontWeight.Bold)
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f), CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack, 
+                            contentDescription = "Back", 
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    
+                    Text(
+                        text = if (postId == null) "New Story" else "Edit Story",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    
+                    Button(
+                        onClick = { viewModel.createPost(content, selectedImageUri, postId) },
+                        enabled = (content.isNotBlank() || selectedImageUri != null) && !loading,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp)
+                    ) {
+                        if (loading) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.EditNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (postId == null) "Publish" else "Save", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
             }
         },
-        containerColor = BackgroundLight
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             // Main Card
@@ -142,7 +158,7 @@ fun CreatePostScreen(
                     .fillMaxHeight(0.85f)
                     .padding(horizontal = 24.dp, vertical = 12.dp)
                     .shadow(10.dp, RoundedCornerShape(32.dp)),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(32.dp)
             ) {
                 Column(
@@ -156,7 +172,7 @@ fun CreatePostScreen(
                             modifier = Modifier
                                 .size(50.dp)
                                 .clip(CircleShape)
-                                .background(Color.LightGray)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             if (currentUser?.profilePictureUrl?.isNotEmpty() == true) {
                                 Image(
@@ -169,8 +185,8 @@ fun CreatePostScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text(currentUser?.name ?: "User", fontWeight = FontWeight.Bold, color = TextDark, fontSize = 16.sp)
-                            Text("Share with everyone", color = TextGray, fontSize = 12.sp)
+                            Text(currentUser?.name ?: "User", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, fontSize = 16.sp)
+                            Text("Share with everyone", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                         }
                     }
 
@@ -179,7 +195,7 @@ fun CreatePostScreen(
                     TextField(
                         value = content,
                         onValueChange = { content = it },
-                        placeholder = { Text("What's on your mind today?", color = Color.LightGray, fontSize = 18.sp) },
+                        placeholder = { Text("What's on your mind today?", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 18.sp) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
@@ -189,9 +205,9 @@ fun CreatePostScreen(
                             disabledContainerColor = Color.Transparent,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = PrimaryPurple
+                            cursorColor = MaterialTheme.colorScheme.primary
                         ),
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, color = TextDark)
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
                     )
 
                     if (selectedImageUri != null) {
@@ -231,7 +247,7 @@ fun CreatePostScreen(
                     .height(56.dp)
                     .width(160.dp)
                     .shadow(8.dp, RoundedCornerShape(28.dp)),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(28.dp)
             ) {
                 Row(
@@ -239,9 +255,9 @@ fun CreatePostScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = PrimaryPurple, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add Media", color = PrimaryPurple, fontWeight = FontWeight.Bold)
+                    Text("Add Media", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             }
         }

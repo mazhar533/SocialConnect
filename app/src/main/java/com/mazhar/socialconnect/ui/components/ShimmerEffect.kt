@@ -16,8 +16,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.mazhar.socialconnect.ui.theme.CardBackground
-import com.mazhar.socialconnect.ui.theme.PrimaryPurple
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.MaterialTheme
 
 fun Modifier.shimmerEffect(): Modifier = composed {
     val transition = rememberInfiniteTransition(label = "")
@@ -31,10 +31,11 @@ fun Modifier.shimmerEffect(): Modifier = composed {
         label = ""
     )
 
+    val shimmerBaseColor = MaterialTheme.colorScheme.onSurface
     val shimmerColors = listOf(
-        Color.LightGray.copy(alpha = 0.6f),
-        Color.LightGray.copy(alpha = 0.2f),
-        Color.LightGray.copy(alpha = 0.6f),
+        shimmerBaseColor.copy(alpha = 0.1f),
+        shimmerBaseColor.copy(alpha = 0.3f),
+        shimmerBaseColor.copy(alpha = 0.1f),
     )
 
     this.background(
@@ -52,7 +53,7 @@ fun PostCardSkeleton() {
         modifier = Modifier
             .fillMaxWidth(0.9f)
             .padding(vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(24.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -84,16 +85,16 @@ fun ProfileHeaderSkeleton() {
                 .fillMaxWidth()
                 .height(180.dp)
                 .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-                .background(PrimaryPurple)
+                .background(MaterialTheme.colorScheme.primary)
+                .statusBarsPadding()
+                .padding(start = 24.dp, top = 0.dp, end = 24.dp, bottom = 16.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .width(80.dp)
-                    .height(20.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.White.copy(alpha = 0.3f))
-                    .shimmerEffect()
+            androidx.compose.material3.Text(
+                text = "SocialConnect",
+                color = MaterialTheme.colorScheme.secondary,
+                fontSize = 18.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
             )
         }
 
@@ -103,7 +104,7 @@ fun ProfileHeaderSkeleton() {
                 .fillMaxWidth(0.9f)
                 .padding(top = 110.dp)
                 .align(Alignment.TopCenter),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(32.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -146,7 +147,7 @@ fun ProfileHeaderSkeleton() {
                 .size(100.dp)
                 .align(Alignment.TopCenter)
                 .clip(CircleShape)
-                .background(Color.LightGray)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .shimmerEffect()
         )
     }
@@ -158,21 +159,32 @@ fun HomeHeaderSkeleton() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-            .background(PrimaryPurple)
-            .padding(24.dp)
-            .padding(top = 24.dp)
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Box(modifier = Modifier.width(60.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.2f)).shimmerEffect())
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(modifier = Modifier.width(120.dp).height(20.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.3f)).shimmerEffect())
+        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+            // App Name (Static)
+            androidx.compose.material3.Text(
+                text = "SocialConnect",
+                color = MaterialTheme.colorScheme.secondary,
+                fontSize = 24.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Box(modifier = Modifier.width(60.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)).shimmerEffect())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.width(120.dp).height(20.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)).shimmerEffect())
+                }
+                Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)).shimmerEffect())
             }
-            Box(modifier = Modifier.size(50.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)).shimmerEffect())
         }
     }
 }
@@ -188,5 +200,88 @@ fun FeedHeaderSkeleton() {
     ) {
         Box(modifier = Modifier.width(100.dp).height(24.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
         Box(modifier = Modifier.width(80.dp).height(36.dp).clip(RoundedCornerShape(24.dp)).shimmerEffect())
+    }
+}
+@Composable
+fun UserListSkeleton() {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        repeat(5) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.size(48.dp).clip(CircleShape).shimmerEffect())
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Box(modifier = Modifier.width(120.dp).height(16.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.width(80.dp).height(12.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProfileEditSkeleton() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(32.dp))
+        // Profile image skeleton
+        Box(modifier = Modifier.size(90.dp).clip(CircleShape).shimmerEffect())
+        Spacer(modifier = Modifier.height(16.dp))
+        Box(modifier = Modifier.width(120.dp).height(36.dp).clip(RoundedCornerShape(16.dp)).shimmerEffect())
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        // Card skeleton
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                repeat(3) {
+                    Box(modifier = Modifier.width(100.dp).height(12.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).shimmerEffect())
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+}
+@Composable
+fun NotificationSkeleton() {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        repeat(8) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.size(48.dp).clip(CircleShape).shimmerEffect())
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Box(modifier = Modifier.fillMaxWidth(0.6f).height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.width(100.dp).height(10.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(modifier = Modifier.size(20.dp).clip(CircleShape).shimmerEffect())
+            }
+            androidx.compose.material3.HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 8.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+        }
     }
 }

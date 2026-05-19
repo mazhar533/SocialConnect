@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,7 +57,10 @@ fun RecoveryScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
+                    colors = if (isSystemInDarkTheme()) listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.background
+                    ) else listOf(
                         Color(0xFFE2EAFC),
                         Color(0xFFF9DDD6)
                     )
@@ -68,7 +72,7 @@ fun RecoveryScreen(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .padding(vertical = 24.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(32.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -88,13 +92,13 @@ fun RecoveryScreen(
                     IconButton(
                         onClick = onNavigateBack,
                         modifier = Modifier
-                            .background(Color(0xFFF0F0F3), CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                             .size(40.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = PrimaryPurple
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -104,13 +108,13 @@ fun RecoveryScreen(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(PrimaryPurple),
+                        .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Key,
                         contentDescription = "Key Icon",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(40.dp)
                     )
                 }
@@ -121,7 +125,7 @@ fun RecoveryScreen(
                     text = "Recovery",
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextDark
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -129,7 +133,7 @@ fun RecoveryScreen(
                 Text(
                     text = "Don't worry, happens to the best of\nus. Let's get you back in.",
                     fontSize = 14.sp,
-                    color = TextGray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
 
