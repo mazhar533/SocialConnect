@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,10 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mazhar.socialconnect.ui.components.PostCard
 import com.google.firebase.auth.FirebaseAuth
+import android.widget.Toast
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material.icons.filled.Info
+
 import com.mazhar.socialconnect.ui.components.PostCardSkeleton
 import com.mazhar.socialconnect.ui.components.ProfileHeaderSkeleton
 import com.mazhar.socialconnect.ui.components.FeedHeaderSkeleton
@@ -45,6 +50,7 @@ import com.mazhar.socialconnect.ui.components.UserListSkeleton
 @Composable
 fun ProfileScreen(
     userId: String? = null,
+    showRequests: Boolean = false,
     onNavigateToEditProfile: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToHome: () -> Unit,
@@ -69,11 +75,17 @@ fun ProfileScreen(
     
     var showShareSheet by remember { mutableStateOf(false) }
     var selectedPostForShare by remember { mutableStateOf<com.mazhar.socialconnect.data.model.Post?>(null) }
+    var showRequestsSheet by remember { mutableStateOf(false) }
     val followingUsers by viewModel.followingUsers.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
     
     LaunchedEffect(userId) {
         viewModel.loadProfile(userId)
+    }
+    LaunchedEffect(showRequests) {
+        if (showRequests) {
+            showRequestsSheet = true
+        }
     }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val isFollowingTarget = userData?.followers?.contains(currentUserId) == true
@@ -162,6 +174,82 @@ fun ProfileScreen(
                                 Spacer(modifier = Modifier.height(45.dp)) // Space for overlapping image
 
                                 Text(userData?.name ?: "Loading...", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                 
+                                 val userEmail = userData?.email
+                                 if (!userEmail.isNullOrEmpty()) {
+                                     Spacer(modifier = Modifier.height(2.dp))
+                                     Text(
+                                         text = userEmail,
+                                         fontSize = 14.sp,
+                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                     )
+                                 }
+
+                                 if (isOwnProfile) {
+                                     Spacer(modifier = Modifier.height(6.dp))
+                                     var isEmailVerified by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.isEmailVerified == true) }
+                                     
+                                     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                                     DisposableEffect(lifecycleOwner) {
+                                         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                                             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                                                 viewModel.reloadUser { success ->
+                                                     if (success) {
+                                                         isEmailVerified = FirebaseAuth.getInstance().currentUser?.isEmailVerified == true
+                                                     }
+                                                 }
+                                             }
+                                         }
+                                         lifecycleOwner.lifecycle.addObserver(observer)
+                                         onDispose {
+                                             lifecycleOwner.lifecycle.removeObserver(observer)
+                                         }
+                                     }
+
+                                     val badgeBgColor = if (isEmailVerified) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+                                     val badgeBorderColor = if (isEmailVerified) Color(0xFF81C784) else Color(0xFFFFB74D)
+                                     val badgeTextColor = if (isEmailVerified) Color(0xFF2E7D32) else Color(0xFFE65100)
+                                     val badgeText = if (isEmailVerified) "Verified" else "Unverified (Click to verify)"
+                                     val badgeIcon = if (isEmailVerified) Icons.Default.Check else Icons.Default.Info
+
+                                     Surface(
+                                         modifier = Modifier
+                                             .clip(RoundedCornerShape(12.dp))
+                                             .clickable(enabled = !isEmailVerified) {
+                                                 viewModel.sendEmailVerification { success, errorMsg ->
+                                                     if (success) {
+                                                         Toast.makeText(context, "Verification email sent to $userEmail", Toast.LENGTH_LONG).show()
+                                                     } else {
+                                                         Toast.makeText(context, "Failed to send: $errorMsg", Toast.LENGTH_LONG).show()
+                                                     }
+                                                 }
+                                             },
+                                         color = badgeBgColor,
+                                         border = androidx.compose.foundation.BorderStroke(1.dp, badgeBorderColor),
+                                         shape = RoundedCornerShape(12.dp)
+                                     ) {
+                                         Row(
+                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                             verticalAlignment = Alignment.CenterVertically
+                                         ) {
+                                             Icon(
+                                                 imageVector = badgeIcon,
+                                                 contentDescription = null,
+                                                 tint = badgeTextColor,
+                                                 modifier = Modifier.size(14.dp)
+                                             )
+                                             Spacer(modifier = Modifier.width(6.dp))
+                                             Text(
+                                                 text = badgeText,
+                                                 fontSize = 11.sp,
+                                                 fontWeight = FontWeight.Bold,
+                                                 color = badgeTextColor
+                                             )
+                                         }
+                                     }
+                                 }
+
+                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     userData?.bio ?: "No bio yet",
                                     fontSize = 14.sp,
@@ -217,18 +305,45 @@ fun ProfileScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     if (isOwnProfile) {
-                                        Button(
-                                            onClick = onNavigateToEditProfile,
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                            shape = RoundedCornerShape(16.dp),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .heightIn(min = 48.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text("Edit Profile", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        val followRequests = userData?.followRequests ?: emptyList()
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = onNavigateToEditProfile,
+                                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                                    shape = RoundedCornerShape(16.dp),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .heightIn(min = 48.dp)
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text("Edit Profile", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                                    }
+                                                }
+                                                if (followRequests.isNotEmpty()) {
+                                                    OutlinedButton(
+                                                        onClick = { showRequestsSheet = true },
+                                                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                                                        shape = RoundedCornerShape(16.dp),
+                                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .heightIn(min = 48.dp)
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text("Requests (${followRequests.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     } else {
@@ -252,13 +367,14 @@ fun ProfileScreen(
                                             }
                                         }
                                         Spacer(modifier = Modifier.width(16.dp))
+                                        val hasRequested = userData?.followRequests?.contains(currentUserId) == true
                                         OutlinedButton(
                                             onClick = { userData?.uid?.let { viewModel.toggleFollow(it) } },
                                             colors = ButtonDefaults.outlinedButtonColors(
-                                                containerColor = if (isFollowingTarget) Color.Transparent else MaterialTheme.colorScheme.primary,
-                                                contentColor = if (isFollowingTarget) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onPrimary
+                                                containerColor = if (isFollowingTarget || hasRequested) Color.Transparent else MaterialTheme.colorScheme.primary,
+                                                contentColor = if (isFollowingTarget || hasRequested) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onPrimary
                                             ),
-                                            border = if (isFollowingTarget) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+                                            border = if (isFollowingTarget || hasRequested) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
                                             shape = RoundedCornerShape(16.dp),
                                             contentPadding = PaddingValues(horizontal = 4.dp),
                                             modifier = Modifier
@@ -267,13 +383,13 @@ fun ProfileScreen(
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Icon(
-                                                    if (isFollowingTarget) Icons.Default.Check else Icons.Default.Add,
+                                                    if (isFollowingTarget) Icons.Default.Check else if (hasRequested) Icons.Default.Check else Icons.Default.Add,
                                                     contentDescription = null,
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
-                                                    text = if (isFollowingTarget) "Following" else "Follow",
+                                                    text = if (isFollowingTarget) "Following" else if (hasRequested) "Requested" else "Follow",
                                                     fontSize = 14.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     maxLines = 1
@@ -310,56 +426,101 @@ fun ProfileScreen(
                 }
             }
 
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
+            val isPrivateLocked = !isOwnProfile && userData?.isPrivate == true && !isFollowingTarget
 
-                // My Feed Header (Static, no shimmer)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .padding(horizontal = 8.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("My Feed", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                    
-                    Surface(
-                        shape = RoundedCornerShape(24.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        color = Color.Transparent
+            if (isPrivateLocked) {
+                item {
+                    Spacer(modifier = Modifier.height(48.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Row(
-                            modifier = Modifier.padding(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            shape = CircleShape,
+                            border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f),
+                            modifier = Modifier.size(80.dp)
                         ) {
-                            IconButton(
-                                onClick = { viewModel.setGridView(false) }, 
-                                modifier = Modifier.size(36.dp).clip(CircleShape).background(if (!isGridView) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
-                            ) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    Icons.AutoMirrored.Filled.List, 
-                                    contentDescription = "List View", 
-                                    tint = if (!isGridView) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant, 
-                                    modifier = Modifier.size(20.dp)
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Private Account",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
                                 )
                             }
-                            IconButton(
-                                onClick = { viewModel.setGridView(true) }, 
-                                modifier = Modifier.size(36.dp).clip(CircleShape).background(if (isGridView) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "This Account is Private",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Follow this account to see their photos and videos.",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                }
+            } else {
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // My Feed Header (Static, no shimmer)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .padding(horizontal = 8.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("My Feed", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        
+                        Surface(
+                            shape = RoundedCornerShape(24.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            color = Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Default.GridView, 
-                                    contentDescription = "Grid View", 
-                                    tint = if (isGridView) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant, 
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                IconButton(
+                                    onClick = { viewModel.setGridView(false) }, 
+                                    modifier = Modifier.size(36.dp).clip(CircleShape).background(if (!isGridView) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.List, 
+                                        contentDescription = "List View", 
+                                        tint = if (!isGridView) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant, 
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.setGridView(true) }, 
+                                    modifier = Modifier.size(36.dp).clip(CircleShape).background(if (isGridView) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                                ) {
+                                    Icon(
+                                        Icons.Default.GridView, 
+                                        contentDescription = "Grid View", 
+                                        tint = if (isGridView) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurfaceVariant, 
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            if (postsLoading && userPosts.isEmpty()) {
+                if (postsLoading && userPosts.isEmpty()) {
                 items(3) {
                     PostCardSkeleton()
                     Spacer(modifier = Modifier.height(16.dp))
@@ -441,6 +602,7 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+            }
             }
             
             item {
@@ -559,6 +721,70 @@ fun ProfileScreen(
                                         Text("@${user.name.lowercase().replace(" ", "")}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showRequestsSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showRequestsSheet = false },
+                containerColor = MaterialTheme.colorScheme.surface,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp).padding(bottom = 32.dp)) {
+                    Text("Follow Requests", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    val requestsUsers by viewModel.followRequestsList.collectAsState()
+                    if (requestsUsers.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("No requests found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                            items(requestsUsers) { user ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color.LightGray)) {
+                                            if (user.profilePictureUrl.isNotEmpty()) {
+                                                Image(painter = rememberAsyncImagePainter(user.profilePictureUrl), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(user.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Text("@${user.name.lowercase().replace(" ", "")}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { viewModel.acceptFollowRequest(user.uid) },
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(36.dp)
+                                        ) {
+                                            Text("Accept", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        }
+                                        OutlinedButton(
+                                            onClick = { viewModel.rejectFollowRequest(user.uid) },
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(36.dp)
+                                        ) {
+                                            Text("Delete", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                             }
                         }
                     }

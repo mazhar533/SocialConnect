@@ -15,6 +15,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +52,8 @@ fun ChatListScreen(
     val chatRooms by viewModel.chatRooms.collectAsState()
     val followingUsers by viewModel.followingUsers.collectAsState()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    var roomToDelete by remember { mutableStateOf<ChatRoom?>(null) }
+    var showDeleteWarningDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         bottomBar = {
@@ -160,58 +169,145 @@ fun ChatListScreen(
                         ChatRoomItem(
                             room = room,
                             currentUserId = currentUserId,
-                            onClick = { onNavigateToChatDetail(room.id, targetName, targetImage) }
+                            onClick = { onNavigateToChatDetail(room.id, targetName, targetImage) },
+                            onDeleteClick = {
+                                roomToDelete = room
+                                showDeleteWarningDialog = true
+                            }
                         )
                     }
                 }
             }
         }
     }
+
+    if (showDeleteWarningDialog && roomToDelete != null) {
+        val targetId = roomToDelete!!.participants.firstOrNull { it != currentUserId } ?: ""
+        val targetName = roomToDelete!!.participantNames[targetId] ?: "User"
+        
+        AlertDialog(
+            onDismissRequest = {
+                showDeleteWarningDialog = false
+                roomToDelete = null
+            },
+            icon = {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFFF9800)
+                )
+            },
+            title = {
+                Text("Delete Chat?")
+            },
+            text = {
+                Text("Are you sure you want to delete your chat with $targetName? This will hide the chat room from your list and clear your message history, but the other participant will still see the conversation.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteChatRoom(roomToDelete!!.id)
+                        showDeleteWarningDialog = false
+                        roomToDelete = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color(0xFFFF9800)
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteWarningDialog = false
+                        roomToDelete = null
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ChatRoomItem(room: ChatRoom, currentUserId: String, onClick: () -> Unit) {
+fun ChatRoomItem(
+    room: ChatRoom, 
+    currentUserId: String, 
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
     val targetUserId = room.participants.firstOrNull { it != currentUserId } ?: return
     val targetName = room.participantNames[targetUserId] ?: "User"
     val targetImage = room.participantImages[targetUserId] ?: ""
+    var showMenu by remember { mutableStateOf(false) }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .background(Color.Transparent),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+    Box {
+        Row(
             modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(Color.LightGray)
-        ) {
-            if (targetImage.isNotEmpty()) {
-                Image(
-                    painter = rememberAsyncImagePainter(targetImage),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { showMenu = true }
                 )
-            } else {
-                Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.align(Alignment.Center))
+                .background(Color.Transparent)
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray)
+            ) {
+                if (targetImage.isNotEmpty()) {
+                    Image(
+                        painter = rememberAsyncImagePainter(targetImage),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.align(Alignment.Center))
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(targetName, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, fontSize = 16.sp)
+                    Text(formatTime(room.lastMessageTimestamp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    room.lastMessage,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(targetName, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, fontSize = 16.sp)
-                Text(formatTime(room.lastMessageTimestamp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                room.lastMessage,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Delete Chat", color = Color(0xFFFF9800)) },
+                onClick = {
+                    showMenu = false
+                    onDeleteClick()
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = Color(0xFFFF9800)
+                    )
+                }
             )
         }
     }

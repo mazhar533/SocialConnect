@@ -1,5 +1,7 @@
 package com.mazhar.socialconnect.data.model
 
+import com.google.firebase.firestore.PropertyName
+
 data class User(
     val uid: String = "",
     val name: String = "",
@@ -11,5 +13,11 @@ data class User(
     val followingCount: Int = 0,
     val followers: List<String> = emptyList(),
     val following: List<String> = emptyList(),
-    val fcmToken: String = ""
+    val fcmToken: String = "",
+    var notificationsEnabled: Boolean = true,
+    @get:PropertyName("isPrivate")
+    @set:PropertyName("isPrivate")
+    var isPrivate: Boolean = false,
+    var twoFactorEnabled: Boolean = false,
+    val followRequests: List<String> = emptyList()
 )

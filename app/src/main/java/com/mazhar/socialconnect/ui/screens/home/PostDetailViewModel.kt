@@ -34,13 +34,37 @@ class PostDetailViewModel : ViewModel() {
         try {
             val snapshot = firestore.collection("posts").document(postId).get().await()
             val postObj = snapshot.toObject(Post::class.java)
-            _post.value = postObj
-
+            
             if (postObj != null) {
-                fetchComments(postId)
+                val currentUserId = auth.currentUser?.uid
+                val authorId = postObj.userId
+                var isAllowed = true
+                
+                if (currentUserId != null && authorId != currentUserId) {
+                    val authorDoc = firestore.collection("users").document(authorId).get().await()
+                    val author = authorDoc.toObject(User::class.java)
+                    if (author != null && author.isPrivate) {
+                        val currentUserDoc = firestore.collection("users").document(currentUserId).get().await()
+                        val currentUser = currentUserDoc.toObject(User::class.java)
+                        val isFollowing = currentUser?.following?.contains(authorId) == true
+                        if (!isFollowing) {
+                            isAllowed = false
+                        }
+                    }
+                }
+                
+                if (isAllowed) {
+                    _post.value = postObj
+                    fetchComments(postId)
+                } else {
+                    _post.value = null
+                }
+            } else {
+                _post.value = null
             }
         } catch (e: Exception) {
             // Handle error
+            _post.value = null
         } finally {
             _loading.value = false
         }
@@ -150,31 +174,7 @@ class PostDetailViewModel : ViewModel() {
 
             firestore.collection("notifications").document(notification.id).set(notification).await()
 
-            // Fetch target user's FCM token and send push notification
-            val targetUserSnapshot = firestore.collection("users").document(targetUserId).get().await()
-            val targetToken = targetUserSnapshot.getString("fcmToken")
-            if (!targetToken.isNullOrEmpty()) {
-                val title = "SocialConnect"
-                val body = when (type) {
-                    "like" -> "$fromName liked your post"
-                    "comment" -> "$fromName commented on your post"
-                    "follow" -> "$fromName started following you"
-                    "share" -> "$fromName shared a post with you"
-                    else -> "$fromName notified you"
-                }
-                FcmNotificationSender.sendNotification(
-                    targetToken, 
-                    title, 
-                    body,
-                    imageUrl = postImage,
-                    data = mapOf(
-                        "userImage" to (fromUserImage ?: ""), 
-                        "postId" to (postId ?: ""),
-                        "postContent" to (postContent ?: ""),
-                        "commentId" to (commentId ?: "")
-                    )
-                )
-            }
+
         } catch (e: Exception) {
             // Log error
         }

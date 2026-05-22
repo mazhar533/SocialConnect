@@ -39,6 +39,21 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources {
+            excludes.add("META-INF/INDEX.LIST")
+            excludes.add("META-INF/DEPENDENCIES")
+            excludes.add("META-INF/LICENSE")
+            excludes.add("META-INF/LICENSE.txt")
+            excludes.add("META-INF/license.txt")
+            excludes.add("META-INF/LICENSE.md")
+            excludes.add("META-INF/NOTICE")
+            excludes.add("META-INF/NOTICE.txt")
+            excludes.add("META-INF/notice.txt")
+            excludes.add("META-INF/NOTICE.md")
+            excludes.add("META-INF/ASL2.0")
+        }
+    }
 }
 
 dependencies {
@@ -62,6 +77,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.coil.compose)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.google.auth.library.oauth2.http)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

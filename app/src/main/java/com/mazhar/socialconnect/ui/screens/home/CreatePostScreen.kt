@@ -150,7 +150,12 @@ fun CreatePostScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .navigationBarsPadding()
+        ) {
             // Main Card
             Card(
                 modifier = Modifier

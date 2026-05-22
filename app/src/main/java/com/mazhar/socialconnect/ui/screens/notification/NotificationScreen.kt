@@ -30,6 +30,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,9 +47,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun NotificationScreen(
     onNavigateToProfile: (String) -> Unit,
+    onNavigateToRequests: () -> Unit,
     onNavigateToPost: (String, String?) -> Unit,
     onNavigateToHome: () -> Unit,
     onNavigateToChats: () -> Unit,
+    onNavigateToChatDetail: (String, String, String) -> Unit,
     onNavigateToCreatePost: (String?) -> Unit,
     viewModel: NotificationViewModel = viewModel()
 ) {
@@ -149,9 +154,19 @@ fun NotificationScreen(
                             onClick = {
                                 viewModel.markAsRead(notification.id)
                                 when (notification.type) {
-                                    "follow" -> onNavigateToProfile(notification.fromUserId)
+                                    "follow", "follow_accept" -> onNavigateToProfile(notification.fromUserId)
+                                    "follow_request" -> onNavigateToRequests()
                                     "like", "comment", "share" -> {
                                         notification.postId?.let { onNavigateToPost(it, notification.commentId) }
+                                    }
+                                    "message" -> {
+                                        viewModel.getOrCreateChatRoom(notification.fromUserId) { roomId ->
+                                            onNavigateToChatDetail(
+                                                roomId,
+                                                notification.fromUserName,
+                                                notification.fromUserProfilePicture ?: ""
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -252,25 +267,27 @@ fun NotificationItem(
                 "like" -> "liked your post"
                 "comment" -> "commented on your post"
                 "follow" -> "started following you"
+                "follow_request" -> "sent you a follow request"
+                "follow_accept" -> "accepted your follow request"
                 "message" -> "sent you a message"
                 "share" -> "shared a post with you"
                 else -> "notified you"
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = notification.fromUserName,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = text,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp
-                )
+            val annotatedText = buildAnnotatedString {
+                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)) {
+                    append(notification.fromUserName)
+                }
+                append(" ")
+                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                    append(text)
+                }
             }
+
+            Text(
+                text = annotatedText,
+                fontSize = 14.sp
+            )
 
             Text(
                 text = formatTimestamp(notification.timestamp),
@@ -285,6 +302,8 @@ fun NotificationItem(
             "like" -> Icons.Default.Favorite
             "comment" -> Icons.AutoMirrored.Filled.Message
             "follow" -> Icons.Default.PersonAdd
+            "follow_request" -> Icons.Default.PersonAdd
+            "follow_accept" -> Icons.Default.CheckCircle
             "message" -> Icons.AutoMirrored.Filled.Message
             "share" -> Icons.Default.GridView
             else -> Icons.Default.Notifications
@@ -293,6 +312,8 @@ fun NotificationItem(
             "like" -> Color.Red
             "comment" -> MaterialTheme.colorScheme.primary
             "follow" -> MaterialTheme.colorScheme.secondary
+            "follow_request" -> MaterialTheme.colorScheme.secondary
+            "follow_accept" -> Color(0xFF4CAF50) // Green
             "message" -> MaterialTheme.colorScheme.tertiary
             "share" -> Color(0xFFE65100) // Branded orange
             else -> Color.Gray

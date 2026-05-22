@@ -26,6 +26,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val firestore = FirebaseFirestore.getInstance()
     private val storage = FirebaseStorage.getInstance()
     private val prefs = application.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+    private var profileListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
 
     private val _isGridView = MutableStateFlow(prefs.getBoolean("is_grid_view", false))
     val isGridView: StateFlow<Boolean> = _isGridView.asStateFlow()
@@ -59,6 +60,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _followingUsers = MutableStateFlow<List<User>>(emptyList())
     val followingUsers: StateFlow<List<User>> = _followingUsers.asStateFlow()
 
+    private val _followRequestsList = MutableStateFlow<List<User>>(emptyList())
+    val followRequestsList: StateFlow<List<User>> = _followRequestsList.asStateFlow()
+
     private var currentTargetUserId: String? = null
 
     fun loadProfile(userId: String?) {
@@ -68,30 +72,48 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         currentTargetUserId = targetId
         _isOwnProfile.value = (targetId == currentUserId)
         
+        profileListenerRegistration?.remove()
+        profileListenerRegistration = null
+        
         fetchUserProfile(targetId)
         fetchUserPosts(targetId)
     }
 
     fun clearMessage() { _message.value = null }
 
-    private fun fetchUserProfile(uid: String) = viewModelScope.launch {
-        _loading.value = true
-        try {
-            val snapshot = firestore.collection("users").document(uid).get().await()
-            val user = snapshot.toObject(User::class.java)
-            _userData.value = user
-            
-            // If it's own profile, fetch following users for sharing
-            if (uid == auth.currentUser?.uid) {
-                fetchFollowingUsers(user?.following ?: emptyList())
+    private fun fetchUserProfile(uid: String) {
+        val currentUserId = auth.currentUser?.uid
+        if (uid == currentUserId) {
+            val cachedUser = com.mazhar.socialconnect.data.UserRepository.currentUserData.value
+            if (cachedUser != null) {
+                _userData.value = cachedUser
+                fetchFollowingUsers(cachedUser.following)
+                fetchFollowRequestsList(cachedUser.followRequests)
+            } else {
+                _loading.value = true
             }
-        } catch (e: Exception) {
-            _message.value = "Failed to load profile"
-        } finally {
-            if (_userPosts.value.isNotEmpty() || _userData.value != null) {
-                // Only stop loading if we have some data or both failed
-            }
+        } else {
+            _loading.value = true
+        }
+        profileListenerRegistration?.remove()
+        
+        val docRef = firestore.collection("users").document(uid)
+        profileListenerRegistration = docRef.addSnapshotListener { snapshot, error ->
             _loading.value = false
+            if (error != null) {
+                _message.value = "Failed to load profile: ${error.localizedMessage}"
+                return@addSnapshotListener
+            }
+            if (snapshot != null && snapshot.exists()) {
+                val user = snapshot.toObject(User::class.java)
+                _userData.value = user
+                
+                // If it's own profile, fetch following users for sharing
+                if (uid == currentUserId) {
+                    fetchFollowingUsers(user?.following ?: emptyList())
+                    fetchFollowRequestsList(user?.followRequests ?: emptyList())
+                }
+            }
         }
     }
 
@@ -200,64 +222,84 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val currentUserId = auth.currentUser?.uid ?: return@launch
         if (currentUserId == targetUserId) return@launch
 
-        // Optimistic UI Update for target user's followers
         val targetUserVal = _userData.value
+        val isPrivate = targetUserVal?.isPrivate == true
+
+        // Optimistic UI Update
         if (targetUserVal != null && targetUserVal.uid == targetUserId) {
             val isCurrentlyFollowing = targetUserVal.followers.contains(currentUserId)
-            val newFollowers = if (isCurrentlyFollowing) {
-                targetUserVal.followers - currentUserId
+            if (isPrivate && !isCurrentlyFollowing) {
+                val alreadyRequested = targetUserVal.followRequests.contains(currentUserId)
+                val newRequests = if (alreadyRequested) {
+                    targetUserVal.followRequests - currentUserId
+                } else {
+                    targetUserVal.followRequests + currentUserId
+                }
+                _userData.value = targetUserVal.copy(
+                    followRequests = newRequests
+                )
             } else {
-                targetUserVal.followers + currentUserId
+                val newFollowers = if (isCurrentlyFollowing) {
+                    targetUserVal.followers - currentUserId
+                } else {
+                    targetUserVal.followers + currentUserId
+                }
+                _userData.value = targetUserVal.copy(
+                    followers = newFollowers,
+                    followersCount = newFollowers.size
+                )
             }
-            _userData.value = targetUserVal.copy(
-                followers = newFollowers,
-                followersCount = newFollowers.size
-            )
         }
 
         try {
             val currentUserRef = firestore.collection("users").document(currentUserId)
             val targetUserRef = firestore.collection("users").document(targetUserId)
 
-            firestore.runTransaction { transaction ->
+            val notificationType = firestore.runTransaction { transaction ->
                 val currentUserSnapshot = transaction.get(currentUserRef)
                 val targetUserSnapshot = transaction.get(targetUserRef)
 
-                val currentUser = currentUserSnapshot.toObject(User::class.java) ?: return@runTransaction
-                val targetUser = targetUserSnapshot.toObject(User::class.java) ?: return@runTransaction
+                val currentUser = currentUserSnapshot.toObject(User::class.java) ?: return@runTransaction null
+                val targetUser = targetUserSnapshot.toObject(User::class.java) ?: return@runTransaction null
 
                 val isFollowing = currentUser.following.contains(targetUserId)
+                val notificationToSend: String?
 
-                val newFollowing = if (isFollowing) {
-                    currentUser.following - targetUserId
+                if (targetUser.isPrivate && !isFollowing) {
+                    val alreadyRequested = targetUser.followRequests.contains(currentUserId)
+                    notificationToSend = if (alreadyRequested) null else "follow_request"
+                    val newRequests = if (alreadyRequested) {
+                        targetUser.followRequests - currentUserId
+                    } else {
+                        targetUser.followRequests + currentUserId
+                    }
+                    transaction.update(targetUserRef, "followRequests", newRequests)
                 } else {
-                    currentUser.following + targetUserId
-                }
+                    notificationToSend = if (isFollowing) null else "follow"
+                    val newFollowing = if (isFollowing) {
+                        currentUser.following - targetUserId
+                    } else {
+                        currentUser.following + targetUserId
+                    }
 
-                val newFollowers = if (isFollowing) {
-                    targetUser.followers - currentUserId
-                } else {
-                    targetUser.followers + currentUserId
-                }
+                    val newFollowers = if (isFollowing) {
+                        targetUser.followers - currentUserId
+                    } else {
+                        targetUser.followers + currentUserId
+                    }
 
-                transaction.update(currentUserRef, "following", newFollowing)
-                transaction.update(currentUserRef, "followingCount", newFollowing.size)
+                    transaction.update(currentUserRef, "following", newFollowing)
+                    transaction.update(currentUserRef, "followingCount", newFollowing.size)
 
-                transaction.update(targetUserRef, "followers", newFollowers)
-                transaction.update(targetUserRef, "followersCount", newFollowers.size)
-                
-                if (!isFollowing) {
-                    // Trigger notification after success
+                    transaction.update(targetUserRef, "followers", newFollowers)
+                    transaction.update(targetUserRef, "followersCount", newFollowers.size)
                 }
+                notificationToSend
             }.await()
 
-            // Check if we started following
-            val currentUserSnapshot = firestore.collection("users").document(currentUserId).get().await()
-            val currentUser = currentUserSnapshot.toObject(User::class.java)
-            if (currentUser?.following?.contains(targetUserId) == true) {
-                sendNotification(targetUserId, "follow")
+            notificationType?.let { type ->
+                sendNotification(targetUserId, type)
             }
-
         } catch (e: Exception) {
             _message.value = "Failed to toggle follow"
         }
@@ -362,6 +404,113 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private fun fetchFollowRequestsList(uids: List<String>) = viewModelScope.launch {
+        if (uids.isEmpty()) {
+            _followRequestsList.value = emptyList()
+            return@launch
+        }
+        try {
+            val users = mutableListOf<User>()
+            for (chunk in uids.chunked(10)) {
+                val snapshot = firestore.collection("users")
+                    .whereIn("uid", chunk)
+                    .get().await()
+                users.addAll(snapshot.toObjects(User::class.java))
+            }
+            _followRequestsList.value = users
+        } catch (e: Exception) {
+            // Handle error
+        }
+    }
+
+    fun acceptFollowRequest(requesterUid: String) = viewModelScope.launch {
+        val currentUserId = auth.currentUser?.uid ?: return@launch
+        
+        val previousUserData = _userData.value
+        val previousRequestsList = _followRequestsList.value
+        
+        // Optimistic UI Update
+        val currentUserVal = _userData.value
+        if (currentUserVal != null && currentUserVal.uid == currentUserId) {
+            val containsRequester = currentUserVal.followers.contains(requesterUid)
+            val newFollowers = if (containsRequester) currentUserVal.followers else currentUserVal.followers + requesterUid
+            _userData.value = currentUserVal.copy(
+                followRequests = currentUserVal.followRequests - requesterUid,
+                followers = newFollowers,
+                followersCount = newFollowers.size
+            )
+        }
+        _followRequestsList.value = _followRequestsList.value.filter { it.uid != requesterUid }
+
+        try {
+            val currentUserRef = firestore.collection("users").document(currentUserId)
+            val requesterRef = firestore.collection("users").document(requesterUid)
+
+            firestore.runTransaction { transaction ->
+                val currentUserSnapshot = transaction.get(currentUserRef)
+                val requesterSnapshot = transaction.get(requesterRef)
+
+                val currentUser = currentUserSnapshot.toObject(User::class.java) ?: return@runTransaction
+                val requester = requesterSnapshot.toObject(User::class.java) ?: return@runTransaction
+
+                // Remove from followRequests, add to followers
+                val newRequests = currentUser.followRequests - requesterUid
+                val newFollowers = if (currentUser.followers.contains(requesterUid)) currentUser.followers else currentUser.followers + requesterUid
+
+                // Add currentUserId to requester's following
+                val newFollowing = if (requester.following.contains(currentUserId)) requester.following else requester.following + currentUserId
+
+                transaction.update(currentUserRef, "followRequests", newRequests)
+                transaction.update(currentUserRef, "followers", newFollowers)
+                transaction.update(currentUserRef, "followersCount", newFollowers.size)
+
+                transaction.update(requesterRef, "following", newFollowing)
+                transaction.update(requesterRef, "followingCount", newFollowing.size)
+            }.await()
+
+            sendNotification(requesterUid, "follow_accept")
+        } catch (e: Exception) {
+            // Revert state on failure
+            _userData.value = previousUserData
+            _followRequestsList.value = previousRequestsList
+            _message.value = "Failed to accept follow request"
+        }
+    }
+
+    fun rejectFollowRequest(requesterUid: String) = viewModelScope.launch {
+        val currentUserId = auth.currentUser?.uid ?: return@launch
+        
+        val previousUserData = _userData.value
+        val previousRequestsList = _followRequestsList.value
+        
+        // Optimistic UI Update
+        val currentUserVal = _userData.value
+        if (currentUserVal != null && currentUserVal.uid == currentUserId) {
+            _userData.value = currentUserVal.copy(
+                followRequests = currentUserVal.followRequests - requesterUid
+            )
+        }
+        _followRequestsList.value = _followRequestsList.value.filter { it.uid != requesterUid }
+
+        try {
+            val currentUserRef = firestore.collection("users").document(currentUserId)
+
+            firestore.runTransaction { transaction ->
+                val currentUserSnapshot = transaction.get(currentUserRef)
+                val currentUser = currentUserSnapshot.toObject(User::class.java) ?: return@runTransaction
+
+                // Remove from followRequests
+                val newRequests = currentUser.followRequests - requesterUid
+                transaction.update(currentUserRef, "followRequests", newRequests)
+            }.await()
+        } catch (e: Exception) {
+            // Revert state on failure
+            _userData.value = previousUserData
+            _followRequestsList.value = previousRequestsList
+            _message.value = "Failed to reject follow request"
+        }
+    }
+
     fun sharePost(post: Post, targetUserId: String) = viewModelScope.launch {
         sendNotification(targetUserId, "share", post.id, post.imageUrl, post.content)
         sendShareMessage(post, targetUserId)
@@ -436,32 +585,56 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
             firestore.collection("notifications").document(notification.id).set(notification).await()
 
-            // Fetch target user's FCM token and send push notification
-            val targetUserSnapshot = firestore.collection("users").document(targetUserId).get().await()
-            val targetToken = targetUserSnapshot.getString("fcmToken")
-            if (!targetToken.isNullOrEmpty()) {
-                val title = "SocialConnect"
-                val body = when (type) {
-                    "like" -> "$fromName liked your post"
-                    "comment" -> "$fromName commented on your post"
-                    "follow" -> "$fromName started following you"
-                    "share" -> "$fromName shared a post with you"
-                    else -> "$fromName notified you"
-                }
-                FcmNotificationSender.sendNotification(
-                    targetToken, 
-                    title, 
-                    body,
-                    imageUrl = postImage,
-                    data = mapOf(
-                        "userImage" to (fromUserImage ?: ""), 
-                        "postId" to (postId ?: ""),
-                        "postContent" to (postContent ?: "")
-                    )
-                )
-            }
+
         } catch (e: Exception) {
             // Log error
         }
     }
+
+    fun sendEmailVerification(onComplete: (Boolean, String?) -> Unit) {
+        val user = auth.currentUser
+        if (user != null) {
+            user.sendEmailVerification()
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        onComplete(true, null)
+                    } else {
+                        onComplete(false, task.exception?.localizedMessage)
+                    }
+                }
+        } else {
+            onComplete(false, "User not logged in")
+        }
+    }
+
+    fun reloadUser(onComplete: (Boolean) -> Unit) {
+        val user = auth.currentUser
+        if (user != null) {
+            user.reload().addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val firebaseEmail = user.email
+                    val currentFirestoreUser = _userData.value
+                    if (firebaseEmail != null && currentFirestoreUser != null && firebaseEmail != currentFirestoreUser.email) {
+                        firestore.collection("users").document(user.uid)
+                            .update("email", firebaseEmail)
+                            .addOnCompleteListener { firestoreTask ->
+                                onComplete(firestoreTask.isSuccessful)
+                            }
+                    } else {
+                        onComplete(true)
+                    }
+                } else {
+                    onComplete(false)
+                }
+            }
+        } else {
+            onComplete(false)
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        profileListenerRegistration?.remove()
+    }
 }
+

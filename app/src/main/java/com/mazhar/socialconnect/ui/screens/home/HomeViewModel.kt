@@ -8,6 +8,7 @@ import com.google.firebase.firestore.Query
 import com.mazhar.socialconnect.data.model.Post
 import com.mazhar.socialconnect.data.model.User
 import com.mazhar.socialconnect.data.FcmNotificationSender
+import com.mazhar.socialconnect.data.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,24 +25,76 @@ class HomeViewModel : ViewModel() {
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
-    private val _currentUserData = MutableStateFlow<User?>(null)
-    val currentUserData: StateFlow<User?> = _currentUserData.asStateFlow()
+    val currentUserData: StateFlow<User?> = UserRepository.currentUserData
 
     private val _followingUsers = MutableStateFlow<List<User>>(emptyList())
     val followingUsers: StateFlow<List<User>> = _followingUsers.asStateFlow()
 
     init {
         fetchPosts()
-        fetchCurrentUserData()
+        UserRepository.startListeningToCurrentUser()
+        viewModelScope.launch {
+            UserRepository.currentUserData.collect { user ->
+                if (user != null) {
+                    fetchFollowingUsers()
+                }
+            }
+        }
     }
 
     fun fetchPosts() = viewModelScope.launch {
         _loading.value = true
         try {
+            val currentUserId = auth.currentUser?.uid
+            val followingList = if (currentUserId != null) {
+                try {
+                    val userDoc = firestore.collection("users").document(currentUserId).get().await()
+                    userDoc.toObject(User::class.java)?.following ?: emptyList()
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+
             val snapshot = firestore.collection("posts")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .get().await()
-            _posts.value = snapshot.toObjects(Post::class.java)
+            val allPosts = snapshot.toObjects(Post::class.java)
+
+            if (currentUserId == null) {
+                _posts.value = allPosts
+                return@launch
+            }
+
+            val uidsToFetch = allPosts.map { it.userId }
+                .distinct()
+                .filter { it != currentUserId && !followingList.contains(it) }
+
+            val privateUserIds = mutableSetOf<String>()
+            if (uidsToFetch.isNotEmpty()) {
+                for (chunk in uidsToFetch.chunked(30)) {
+                    val usersSnapshot = firestore.collection("users")
+                        .whereIn("uid", chunk)
+                        .get().await()
+                    for (doc in usersSnapshot.documents) {
+                        val isPrivate = doc.getBoolean("isPrivate") ?: false
+                        val uid = doc.getString("uid") ?: doc.id
+                        if (isPrivate) {
+                            privateUserIds.add(uid)
+                        }
+                    }
+                }
+            }
+
+            val filteredPosts = allPosts.filter { post ->
+                val isOwnPost = post.userId == currentUserId
+                val isFollowing = followingList.contains(post.userId)
+                val isPrivate = privateUserIds.contains(post.userId)
+                isOwnPost || isFollowing || !isPrivate
+            }
+
+            _posts.value = filteredPosts
         } catch (e: Exception) {
             // Handle error
         } finally {
@@ -50,19 +103,12 @@ class HomeViewModel : ViewModel() {
     }
 
     fun fetchCurrentUserData() {
-        val uid = auth.currentUser?.uid ?: return
-        firestore.collection("users").document(uid).addSnapshotListener { snapshot, e ->
-            if (e != null) return@addSnapshotListener
-            if (snapshot != null && snapshot.exists()) {
-                _currentUserData.value = snapshot.toObject(User::class.java)
-                fetchFollowingUsers() // Update following users list
-            }
-        }
+        UserRepository.startListeningToCurrentUser()
     }
 
     fun fetchFollowingUsers() = viewModelScope.launch {
         val currentUserId = auth.currentUser?.uid ?: return@launch
-        val followingUids = _currentUserData.value?.following ?: emptyList()
+        val followingUids = UserRepository.currentUserData.value?.following ?: emptyList()
         
         try {
             // Also get users from chat rooms
@@ -158,7 +204,7 @@ class HomeViewModel : ViewModel() {
         if (currentUserId == targetUserId) return@launch
 
         // Optimistic UI Update
-        val currentUserVal = _currentUserData.value
+        val currentUserVal = UserRepository.currentUserData.value
         if (currentUserVal != null) {
             val isCurrentlyFollowing = currentUserVal.following.contains(targetUserId)
             val newFollowing = if (isCurrentlyFollowing) {
@@ -166,10 +212,10 @@ class HomeViewModel : ViewModel() {
             } else {
                 currentUserVal.following + targetUserId
             }
-            _currentUserData.value = currentUserVal.copy(
+            UserRepository.updateCurrentUser(currentUserVal.copy(
                 following = newFollowing,
                 followingCount = newFollowing.size
-            )
+            ))
         }
 
         try {
@@ -209,13 +255,14 @@ class HomeViewModel : ViewModel() {
                 }
             }.await()
 
-            val isCurrentlyFollowing = _currentUserData.value?.following?.contains(targetUserId) == true
+            val isCurrentlyFollowing = UserRepository.currentUserData.value?.following?.contains(targetUserId) == true
             if (isCurrentlyFollowing) {
                 sendNotification(targetUserId, "follow")
             }
 
             // Refresh user data to get updated following list
             fetchCurrentUserData()
+            fetchPosts()
         } catch (e: Exception) {
             // Handle error
         }
@@ -299,31 +346,7 @@ class HomeViewModel : ViewModel() {
 
             firestore.collection("notifications").document(notification.id).set(notification).await()
 
-            // Fetch target user's FCM token and send push notification
-            val targetUserSnapshot = firestore.collection("users").document(targetUserId).get().await()
-            val targetToken = targetUserSnapshot.getString("fcmToken")
-            if (!targetToken.isNullOrEmpty()) {
-                val title = "SocialConnect"
-                val body = when (type) {
-                    "like" -> "$fromName liked your post"
-                    "comment" -> "$fromName commented on your post"
-                    "follow" -> "$fromName started following you"
-                    "share" -> "$fromName shared a post with you"
-                    else -> "$fromName notified you"
-                }
-                FcmNotificationSender.sendNotification(
-                    targetToken, 
-                    title, 
-                    body,
-                    imageUrl = postImage,
-                    data = mapOf(
-                        "userImage" to (fromUserImage ?: ""), 
-                        "postId" to (postId ?: ""),
-                        "postContent" to (postContent ?: ""),
-                        "commentId" to (commentId ?: "")
-                    )
-                )
-            }
+
         } catch (e: Exception) {
             // Log error
         }

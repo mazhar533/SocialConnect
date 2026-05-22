@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
 import com.mazhar.socialconnect.ui.theme.*
 import androidx.compose.ui.platform.LocalContext
-import com.mazhar.socialconnect.service.NotificationHandler
 
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,7 +62,6 @@ fun HomeScreen(
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.fetchPosts()
         viewModel.fetchCurrentUserData()
-        NotificationHandler.startListening(context)
     }
 
     Scaffold(
@@ -306,11 +304,10 @@ fun CustomBottomNavigationBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp)
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 20.dp),
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
+            verticalAlignment = Alignment.CenterVertically
         ) {
             NavBarItem(icon = Icons.Default.Home, isSelected = selectedRoute == "home", onClick = onHomeClick)
             NavBarItem(icon = Icons.Default.Edit, isSelected = selectedRoute == "edit", onClick = onEditClick)

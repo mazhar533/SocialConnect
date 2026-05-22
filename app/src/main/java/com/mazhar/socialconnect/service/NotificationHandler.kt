@@ -22,6 +22,8 @@ import kotlinx.coroutines.launch
 object NotificationHandler {
 
     private var listenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
+    private var userSettingsListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var notificationsEnabled: Boolean = true
 
     fun startListening(context: Context) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
@@ -30,10 +32,25 @@ object NotificationHandler {
             return
         }
         
-        // Remove existing listener if any
+        // Remove existing listeners if any
         listenerRegistration?.remove()
+        userSettingsListener?.remove()
         
         val db = FirebaseFirestore.getInstance()
+        
+        // Listen to current user settings for real-time notification preference updates
+        userSettingsListener = db.collection("users").document(uid)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    android.util.Log.e("NotificationHandler", "User settings listen failed: ${e.message}")
+                    return@addSnapshotListener
+                }
+                if (snapshot != null && snapshot.exists()) {
+                    notificationsEnabled = snapshot.getBoolean("notificationsEnabled") ?: true
+                    android.util.Log.d("NotificationHandler", "Updated local notificationsEnabled setting: $notificationsEnabled")
+                }
+            }
+
         android.util.Log.d("NotificationHandler", "Started listening for user: $uid")
         
         // Subtract 5 seconds to catch notifications created exactly at start time
@@ -52,20 +69,14 @@ object NotificationHandler {
 
                 snapshot?.documentChanges?.forEach { dc ->
                     if (dc.type == DocumentChange.Type.ADDED) {
+                        if (!notificationsEnabled) {
+                            android.util.Log.d("NotificationHandler", "Notifications disabled by user. Skipping notification popup.")
+                            return@forEach
+                        }
                         val type = dc.document.getString("type") ?: ""
                         val fromName = dc.document.getString("fromUserName") ?: "Someone"
                         
                         android.util.Log.d("NotificationHandler", "New notification added: $type from $fromName")
-                        
-                        val title = "SocialConnect"
-                        val message = when (type) {
-                            "like" -> "$fromName liked your post"
-                            "comment" -> "$fromName commented on your post"
-                            "follow" -> "$fromName started following you"
-                            "message" -> "$fromName sent you a message"
-                            "share" -> "$fromName shared a post with you"
-                            else -> "$fromName notified you"
-                        }
                         
                         val userImage = dc.document.getString("fromUserProfilePicture")
                         val postImage = dc.document.getString("postImage")
@@ -73,10 +84,23 @@ object NotificationHandler {
                             ?: dc.document.get("content")?.toString() 
                             ?: dc.document.get("text")?.toString()
                         
+                        val title = if (type == "message") "$fromName (Chat)" else "SocialConnect"
+                        val message = when (type) {
+                            "like" -> "$fromName liked your post"
+                            "comment" -> "$fromName commented on your post"
+                            "follow" -> "$fromName started following you"
+                            "follow_request" -> "$fromName sent you a follow request"
+                            "follow_accept" -> "$fromName accepted your follow request"
+                            "message" -> postContent ?: "Sent you a message"
+                            "share" -> "$fromName shared a post with you"
+                            else -> "$fromName notified you"
+                        }
+                        
                         val postId = dc.document.getString("postId")
                         val commentId = dc.document.getString("commentId")
+                        val fromUserId = dc.document.getString("fromUserId")
                         
-                        showNotification(context, title, message, userImage, postImage, postContent, postId, commentId)
+                        showNotification(context, title, message, userImage, postImage, postContent, postId, commentId, type, fromUserId)
                     }
                 }
             }
@@ -90,7 +114,9 @@ object NotificationHandler {
         postImage: String? = null,
         postContent: String? = null,
         postId: String? = null,
-        commentId: String? = null
+        commentId: String? = null,
+        type: String? = null,
+        fromUserId: String? = null
     ) {
         val coroutineScope = kotlinx.coroutines.MainScope()
         coroutineScope.launch(Dispatchers.Main) {
@@ -117,13 +143,15 @@ object NotificationHandler {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("postId", postId)
                 putExtra("commentId", commentId)
+                putExtra("type", type)
+                putExtra("fromUserId", fromUserId)
             }
             val pendingIntent = PendingIntent.getActivity(
                 context, System.currentTimeMillis().toInt(), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val previewContent = if (!postContent.isNullOrEmpty()) {
+            val previewContent = if (!postContent.isNullOrEmpty() && type != "message") {
                 if (postContent.length > 40) postContent.take(40) + "..." else postContent
             } else null
 
@@ -140,6 +168,8 @@ object NotificationHandler {
                 builder.setStyle(NotificationCompat.BigPictureStyle()
                     .bigPicture(bigPicture)
                     .setSummaryText(if (previewContent != null) "$message: $previewContent" else message))
+            } else if (type == "message") {
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(message))
             } else if (!postContent.isNullOrEmpty()) {
                 builder.setStyle(NotificationCompat.BigTextStyle().bigText("$message:\n$postContent"))
             }

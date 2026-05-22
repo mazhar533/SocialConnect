@@ -25,6 +25,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         super.onMessageReceived(remoteMessage)
         
         android.util.Log.d("FCM_SERVICE", "Message Received! Data: ${remoteMessage.data}")
+        
+        val prefs = getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
+        val notificationsEnabled = prefs.getBoolean("notifications", true)
+        if (!notificationsEnabled) {
+            android.util.Log.d("FCM_SERVICE", "Notifications disabled in settings. Skipping FCM notification display.")
+            return
+        }
 
         remoteMessage.notification?.let {
             val title = it.title ?: "SocialConnect"
@@ -34,7 +41,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val postContent = remoteMessage.data["postContent"]
             val postId = remoteMessage.data["postId"]
             val commentId = remoteMessage.data["commentId"]
-            showNotification(title, body, imageUrl, userImage, postContent, postId, commentId)
+            val type = remoteMessage.data["type"]
+            val fromUserId = remoteMessage.data["fromUserId"]
+            showNotification(title, body, imageUrl, userImage, postContent, postId, commentId, type, fromUserId)
         } ?: remoteMessage.data["title"]?.let { title ->
             val body = remoteMessage.data["body"] ?: ""
             val imageUrl = remoteMessage.data["image"]
@@ -42,10 +51,12 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val postContent = remoteMessage.data["postContent"]
             val postId = remoteMessage.data["postId"]
             val commentId = remoteMessage.data["commentId"]
+            val type = remoteMessage.data["type"]
+            val fromUserId = remoteMessage.data["fromUserId"]
             
             android.util.Log.d("FCM_SERVICE", "Showing custom notification: postId=$postId")
             
-            showNotification(title, body, imageUrl, userImage, postContent, postId, commentId)
+            showNotification(title, body, imageUrl, userImage, postContent, postId, commentId, type, fromUserId)
         }
     }
 
@@ -56,7 +67,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         userImage: String? = null,
         postContent: String? = null,
         postId: String? = null,
-        commentId: String? = null
+        commentId: String? = null,
+        type: String? = null,
+        fromUserId: String? = null
     ) {
         val coroutineScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
         coroutineScope.launch {
@@ -80,13 +93,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("postId", postId)
                 putExtra("commentId", commentId)
+                putExtra("type", type)
+                putExtra("fromUserId", fromUserId)
             }
             val pendingIntent = PendingIntent.getActivity(
                 this@MyFirebaseMessagingService, System.currentTimeMillis().toInt(), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val previewContent = if (!postContent.isNullOrEmpty()) {
+            val previewContent = if (!postContent.isNullOrEmpty() && type != "message") {
                 if (postContent.length > 40) postContent.take(40) + "..." else postContent
             } else null
 
@@ -103,6 +118,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 builder.setStyle(NotificationCompat.BigPictureStyle()
                     .bigPicture(bigPicture)
                     .setSummaryText(if (previewContent != null) "$message: $previewContent" else message))
+            } else if (type == "message") {
+                builder.setStyle(NotificationCompat.BigTextStyle().bigText(message))
             } else if (!postContent.isNullOrEmpty()) {
                 builder.setStyle(NotificationCompat.BigTextStyle().bigText("$message:\n$postContent"))
             }

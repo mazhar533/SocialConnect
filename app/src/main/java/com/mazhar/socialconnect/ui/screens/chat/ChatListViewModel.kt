@@ -37,11 +37,32 @@ class ChatListViewModel : ViewModel() {
         try {
             firestore.collection("chatRooms")
                 .whereArrayContains("participants", currentUserId)
-                .orderBy("lastMessageTimestamp", Query.Direction.DESCENDING)
                 .addSnapshotListener { snapshot, error ->
-                    if (error != null) return@addSnapshotListener
+                    if (error != null) {
+                        android.util.Log.e("ChatListViewModel", "Error fetching chat rooms: ${error.message}", error)
+                        return@addSnapshotListener
+                    }
                     if (snapshot != null) {
-                        _chatRooms.value = snapshot.toObjects(ChatRoom::class.java)
+                        val rooms = snapshot.toObjects(ChatRoom::class.java)
+                            .map { room ->
+                                val userClearedAt = room.clearedAt[currentUserId] ?: 0L
+                                val effectiveTimestamp = room.userLastMessageTimestamp[currentUserId] ?: room.lastMessageTimestamp
+                                val effectiveLastMessage = if (effectiveTimestamp <= userClearedAt) {
+                                    ""
+                                } else {
+                                    room.userLastMessage[currentUserId] ?: room.lastMessage
+                                }
+                                room.copy(
+                                    lastMessage = effectiveLastMessage,
+                                    lastMessageTimestamp = effectiveTimestamp
+                                )
+                            }
+                            .filter { room ->
+                                val userDeletedAt = room.deletedAt[currentUserId] ?: 0L
+                                room.lastMessageTimestamp > userDeletedAt
+                            }
+                            .sortedByDescending { it.lastMessageTimestamp }
+                        _chatRooms.value = rooms
                     }
                 }
         } catch (_: Exception) {
@@ -88,6 +109,7 @@ class ChatListViewModel : ViewModel() {
 
         // Create new room
         val roomId = firestore.collection("chatRooms").document().id
+        val now = System.currentTimeMillis()
         val newRoom = ChatRoom(
             id = roomId,
             participants = listOf(currentUserId, targetUser.uid),
@@ -100,10 +122,53 @@ class ChatListViewModel : ViewModel() {
                 targetUser.uid to targetUser.profilePictureUrl
             ),
             lastMessage = "Say Hi!",
-            lastMessageTimestamp = System.currentTimeMillis()
+            lastMessageTimestamp = now,
+            userLastMessage = mapOf(
+                currentUserId to "Say Hi!",
+                targetUser.uid to "Say Hi!"
+            ),
+            userLastMessageTimestamp = mapOf(
+                currentUserId to now,
+                targetUser.uid to now
+            )
         )
 
         firestore.collection("chatRooms").document(roomId).set(newRoom).await()
         onComplete(roomId)
+    }
+
+    fun deleteChatRoom(roomId: String) = viewModelScope.launch {
+        try {
+            val currentUserId = auth.currentUser?.uid ?: return@launch
+            val roomRef = firestore.collection("chatRooms").document(roomId)
+            val currentTime = System.currentTimeMillis()
+            
+            // 1. Update the deletedAt map for the current user in Firestore
+            roomRef.update("deletedAt.$currentUserId", currentTime).await()
+            
+            // 2. Fetch the updated chat room to verify if all participants have deleted it
+            val snapshot = roomRef.get().await()
+            val room = snapshot.toObject(ChatRoom::class.java)
+            if (room != null) {
+                val participants = room.participants
+                val deletedAtMap = room.deletedAt
+                
+                // If all participants have deleted the chat room, clean it up permanently
+                val allDeleted = participants.isNotEmpty() && participants.all { deletedAtMap.containsKey(it) }
+                if (allDeleted) {
+                    val messagesSnapshot = roomRef.collection("messages").get().await()
+                    val batch = firestore.batch()
+                    batch.delete(roomRef)
+                    if (!messagesSnapshot.isEmpty) {
+                        for (doc in messagesSnapshot.documents) {
+                            batch.delete(doc.reference)
+                        }
+                    }
+                    batch.commit().await()
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ChatListViewModel", "Error deleting chat room: ${e.message}", e)
+        }
     }
 }

@@ -38,8 +38,13 @@ class AuthViewModel : ViewModel() {
                 _authState.value = AuthState.Error("Fields cannot be empty")
                 return@launch
             }
-            auth.signInWithEmailAndPassword(email, password).await()
-            _authState.value = AuthState.Success
+            val authResult = auth.signInWithEmailAndPassword(email, password).await()
+            val uid = authResult.user?.uid
+            if (uid != null) {
+                _authState.value = AuthState.Success
+            } else {
+                _authState.value = AuthState.Error("Login failed")
+            }
         } catch (e: Exception) {
             _authState.value = AuthState.Error(e.localizedMessage ?: "Login failed")
         }

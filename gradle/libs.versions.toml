@@ -21,6 +21,7 @@ materialIconsExtended = "1.7.6"
 lifecycleViewModelCompose = "2.8.7"
 coilCompose = "2.7.0"
 foundation = "1.10.6"
+googleAuthLibrary = "1.24.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -49,6 +50,8 @@ androidx-compose-material-icons-extended = { group = "androidx.compose.material"
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleViewModelCompose" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+google-auth-library-oauth2-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "googleAuthLibrary" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

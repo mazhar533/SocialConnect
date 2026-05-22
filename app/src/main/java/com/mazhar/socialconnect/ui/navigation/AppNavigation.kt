@@ -20,11 +20,16 @@ import com.mazhar.socialconnect.ui.screens.settings.SettingsScreen
 import com.mazhar.socialconnect.ui.screens.notification.NotificationScreen
 import com.mazhar.socialconnect.ui.screens.chat.ChatListScreen
 import com.mazhar.socialconnect.ui.screens.chat.ChatDetailScreen
+import com.mazhar.socialconnect.data.model.ChatRoom
+import com.mazhar.socialconnect.data.model.User
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun AppNavigation(
     initialPostId: String? = null,
     initialCommentId: String? = null,
+    initialNotificationType: String? = null,
+    initialFromUserId: String? = null,
     onNavigationHandled: () -> Unit = {}
 ) {
     val navController = rememberNavController()
@@ -32,17 +37,90 @@ fun AppNavigation(
     
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     
-    // Handle initial navigation if coming from notification
-    androidx.compose.runtime.LaunchedEffect(initialPostId, currentBackStackEntry) {
-        // Wait until NavHost has initialized (currentBackStackEntry is not null) before attempting to navigate
-        if (initialPostId != null && auth.currentUser != null && currentBackStackEntry != null) {
-            val route = if (initialCommentId != null) {
-                "post_detail?postId=$initialPostId&commentId=$initialCommentId"
-            } else {
-                "post_detail?postId=$initialPostId"
+    val isSdkReady = auth.currentUser != null && currentBackStackEntry != null
+    androidx.compose.runtime.LaunchedEffect(isSdkReady, initialPostId, initialCommentId, initialNotificationType, initialFromUserId) {
+        // Wait until NavHost has initialized (isSdkReady is true) before attempting to navigate
+        if (isSdkReady) {
+            if (initialPostId != null) {
+                val route = if (initialCommentId != null) {
+                    "post_detail?postId=$initialPostId&commentId=$initialCommentId"
+                } else {
+                    "post_detail?postId=$initialPostId"
+                }
+                navController.navigate(route)
+                onNavigationHandled()
+            } else if (initialNotificationType != null) {
+                android.util.Log.d("AppNavigation", "Navigating from notification type: $initialNotificationType, from: $initialFromUserId")
+                when (initialNotificationType) {
+                    "follow_request" -> {
+                        navController.navigate("profile?showRequests=true")
+                        onNavigationHandled()
+                    }
+                    "follow", "follow_accept" -> {
+                        if (!initialFromUserId.isNullOrEmpty()) {
+                            navController.navigate("profile?userId=$initialFromUserId")
+                        } else {
+                            navController.navigate("profile")
+                        }
+                        onNavigationHandled()
+                    }
+                    "message" -> {
+                        if (!initialFromUserId.isNullOrEmpty()) {
+                            val currentUserId = auth.currentUser?.uid
+                            if (currentUserId != null) {
+                                try {
+                                    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    val snapshot = db.collection("chatRooms")
+                                        .whereArrayContains("participants", currentUserId)
+                                        .get().await()
+
+                                    val rooms = snapshot.toObjects(ChatRoom::class.java)
+                                    val existingRoom = rooms.find { it.participants.contains(initialFromUserId) }
+
+                                    if (existingRoom != null) {
+                                        val targetName = existingRoom.participantNames[initialFromUserId] ?: "Chat"
+                                        val targetImage = existingRoom.participantImages[initialFromUserId] ?: ""
+                                        navController.navigate("chat_detail?roomId=${existingRoom.id}&userName=$targetName&profileImage=$targetImage")
+                                    } else {
+                                        val currentUserSnapshot = db.collection("users").document(currentUserId).get().await()
+                                        val targetUserSnapshot = db.collection("users").document(initialFromUserId).get().await()
+                                        
+                                        val currentUser = currentUserSnapshot.toObject(User::class.java)
+                                        val targetUser = targetUserSnapshot.toObject(User::class.java)
+
+                                        if (currentUser != null && targetUser != null) {
+                                            val roomId = db.collection("chatRooms").document().id
+                                            val newRoom = ChatRoom(
+                                                id = roomId,
+                                                participants = listOf(currentUserId, targetUser.uid),
+                                                participantNames = mapOf(
+                                                    currentUserId to currentUser.name,
+                                                    targetUser.uid to targetUser.name
+                                                ),
+                                                participantImages = mapOf(
+                                                    currentUserId to currentUser.profilePictureUrl,
+                                                    targetUser.uid to targetUser.profilePictureUrl
+                                                ),
+                                                lastMessage = "Say Hi!",
+                                                lastMessageTimestamp = System.currentTimeMillis()
+                                            )
+                                            db.collection("chatRooms").document(roomId).set(newRoom).await()
+                                            navController.navigate("chat_detail?roomId=$roomId&userName=${targetUser.name}&profileImage=${targetUser.profilePictureUrl ?: ""}")
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("AppNavigation", "Error routing to message chat: ${e.localizedMessage}")
+                                }
+                            }
+                        }
+                        onNavigationHandled()
+                    }
+                    else -> {
+                        // Unhandled notification type routing
+                        onNavigationHandled()
+                    }
+                }
             }
-            navController.navigate(route)
-            onNavigationHandled()
         }
     }
 
@@ -102,6 +180,9 @@ fun AppNavigation(
                     val route = if (userId.isNotEmpty()) "profile?userId=$userId" else "profile"
                     navController.navigate(route)
                 },
+                onNavigateToRequests = {
+                    navController.navigate("profile?showRequests=true")
+                },
                 onNavigateToPost = { postId, commentId -> 
                     if (commentId != null) {
                         navController.navigate("post_detail?postId=$postId&commentId=$commentId")
@@ -110,6 +191,9 @@ fun AppNavigation(
                     }
                 },
                 onNavigateToChats = { navController.navigate("chats") },
+                onNavigateToChatDetail = { roomId, name, image ->
+                    navController.navigate("chat_detail?roomId=$roomId&userName=$name&profileImage=$image")
+                },
                 onNavigateToCreatePost = { postId ->
                     val route = if (postId != null) "create_post?postId=$postId" else "create_post"
                     navController.navigate(route)
@@ -123,10 +207,12 @@ fun AppNavigation(
                 postId = postId
             )
         }
-        composable("profile?userId={userId}") { backStackEntry ->
+        composable("profile?userId={userId}&showRequests={showRequests}") { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId")
+            val showRequests = backStackEntry.arguments?.getString("showRequests") == "true"
             ProfileScreen(
                 userId = userId,
+                showRequests = showRequests,
                 onNavigateToEditProfile = { navController.navigate("profile_edit") },
                 onNavigateToSettings = { navController.navigate("settings") },
                 onNavigateToHome = {
