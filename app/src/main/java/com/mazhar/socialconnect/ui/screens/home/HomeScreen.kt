@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,6 +37,7 @@ import com.mazhar.socialconnect.ui.components.PostCard
 import com.google.firebase.auth.FirebaseAuth
 import com.mazhar.socialconnect.ui.components.PostCardSkeleton
 import com.mazhar.socialconnect.ui.components.HomeHeaderSkeleton
+import com.mazhar.socialconnect.ui.components.CustomTextField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +52,10 @@ fun HomeScreen(
     val posts by viewModel.posts.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val currentUserData by viewModel.currentUserData.collectAsState()
+    
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchResultsUsers by viewModel.searchResultsUsers.collectAsState()
+    val isSearching by viewModel.isSearching.collectAsState()
     
     val auth = FirebaseAuth.getInstance()
     val currentUserId = auth.currentUser?.uid ?: ""
@@ -87,44 +93,108 @@ fun HomeScreen(
                 if (currentUserData == null && loading) {
                     HomeHeaderSkeleton()
                 } else {
-                    HomeHeader(currentUserData?.name ?: "User", currentUserData?.profilePictureUrl)
+                    HomeHeader(
+                        userName = currentUserData?.name ?: "User",
+                        profileImageUrl = currentUserData?.profilePictureUrl,
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { viewModel.setSearchQuery(it) }
+                    )
                 }
             }
             
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-            
-            if (loading && posts.isEmpty()) {
-                items(5) {
-                    PostCardSkeleton()
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-            } else if (posts.isEmpty()) {
-                item {
-                    Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No posts yet. Be the first to post!", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (isSearching) {
+                if (searchResultsUsers.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Users",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 8.dp)
+                        )
+                    }
+                    items(searchResultsUsers) { user ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onNavigateToProfile(user.uid) }
+                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                                if (user.profilePictureUrl.isNotEmpty()) {
+                                    Image(
+                                        painter = rememberAsyncImagePainter(user.profilePictureUrl),
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1.0f)) {
+                                Text(user.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                Text("@${user.name.lowercase().replace(" ", "")}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                } else {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No users found matching \"$searchQuery\"", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             } else {
-                items(posts) { post ->
-                    val isFollowing = currentUserData?.following?.contains(post.userId) == true
-                    PostCard(
-                        post = post,
-                        currentUserId = currentUserId,
-                        isFollowing = isFollowing,
-                        onFollowClick = { viewModel.toggleFollow(post.userId) },
-                        onUserClick = { onNavigateToProfile(post.userId) },
-                        onLikeClick = { viewModel.likePost(post) },
-                        onCommentClick = { onNavigateToPost(post.id) },
-                        onShareClick = { 
-                            selectedPostForShare = post
-                            showShareSheet = true 
-                        },
-                        onEditClick = { onNavigateToCreatePost(post.id) },
-                        onDeleteClick = { viewModel.deletePost(post.id) },
-                        onPostClick = { onNavigateToPost(post.id) },
-                        showShareIcon = true
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                if (loading && posts.isEmpty()) {
+                    items(5) {
+                        PostCardSkeleton()
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                } else if (posts.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No posts yet. Be the first to post!", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    items(posts) { post ->
+                        val isFollowing = currentUserData?.following?.contains(post.userId) == true
+                        PostCard(
+                            post = post,
+                            currentUserId = currentUserId,
+                            isFollowing = isFollowing,
+                            onFollowClick = { viewModel.toggleFollow(post.userId) },
+                            onUserClick = { onNavigateToProfile(post.userId) },
+                            onLikeClick = { viewModel.likePost(post) },
+                            onCommentClick = { onNavigateToPost(post.id) },
+                            onShareClick = { 
+                                selectedPostForShare = post
+                                showShareSheet = true 
+                            },
+                            onEditClick = { onNavigateToCreatePost(post.id) },
+                            onDeleteClick = { viewModel.deletePost(post.id) },
+                            onPostClick = { onNavigateToPost(post.id) },
+                            showShareIcon = true
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                 }
             }
         }
@@ -182,7 +252,14 @@ fun HomeScreen(
 }
 
 @Composable
-fun HomeHeader(userName: String, profileImageUrl: String?) {
+fun HomeHeader(
+    userName: String,
+    profileImageUrl: String?,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit
+) {
+    var isSearchExpanded by remember { mutableStateOf(searchQuery.isNotEmpty()) }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,16 +268,60 @@ fun HomeHeader(userName: String, profileImageUrl: String?) {
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            // App Name with stylized look
+            // App Name with stylized look and toggleable Search Icon / TextField in the same line
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (!isSearchExpanded) {
+                    Text(
+                        text = "SocialConnect",
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontSize = 24.sp,
+                        fontFamily = FontFamily.Cursive,
+                        fontWeight = FontWeight.Bold
+                    )
 
-            Text(
-                text = "SocialConnect",
-                color = MaterialTheme.colorScheme.secondary,
-                fontSize = 24.sp,
-                fontFamily = FontFamily.Cursive,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+                    IconButton(
+                        onClick = { isSearchExpanded = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search Users",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = {
+                                isSearchExpanded = false
+                                onSearchQueryChange("")
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Close Search",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+
+                        CustomTextField(
+                            value = searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            placeholder = "Search users...",
+                            icon = Icons.Default.Search,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -230,7 +351,7 @@ fun HomeHeader(userName: String, profileImageUrl: String?) {
                         .padding(2.dp)
                         .clip(CircleShape)
                 ) {
-                    if (profileImageUrl != null) {
+                    if (!profileImageUrl.isNullOrEmpty()) {
                         Image(
                             painter = rememberAsyncImagePainter(profileImageUrl),
                             contentDescription = "Profile Picture",

@@ -30,6 +30,51 @@ class HomeViewModel : ViewModel() {
     private val _followingUsers = MutableStateFlow<List<User>>(emptyList())
     val followingUsers: StateFlow<List<User>> = _followingUsers.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _searchResultsUsers = MutableStateFlow<List<User>>(emptyList())
+    val searchResultsUsers: StateFlow<List<User>> = _searchResultsUsers.asStateFlow()
+
+    private val _isSearching = MutableStateFlow(false)
+    val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+        if (query.isBlank()) {
+            _searchResultsUsers.value = emptyList()
+            _isSearching.value = false
+        } else {
+            _isSearching.value = true
+            performSearch(query)
+        }
+    }
+
+    private fun performSearch(query: String) = viewModelScope.launch {
+        try {
+            // Fetch users up to a reasonable limit and filter them locally to support 
+            // case-insensitive, substring, and multi-word matching on any part of the name.
+            val userSnapshot = firestore.collection("users")
+                .limit(300)
+                .get().await()
+
+            val allUsers = userSnapshot.toObjects(User::class.java)
+            val queryParts = query.lowercase().trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+
+            val filteredUsers = if (queryParts.isEmpty()) {
+                emptyList()
+            } else {
+                allUsers.filter { user ->
+                    val nameLower = user.name.lowercase()
+                    queryParts.all { part -> nameLower.contains(part) }
+                }
+            }
+            _searchResultsUsers.value = filteredUsers
+        } catch (e: Exception) {
+            android.util.Log.e("HomeViewModel", "Search error: ${e.localizedMessage}")
+        }
+    }
+
     init {
         fetchPosts()
         UserRepository.startListeningToCurrentUser()

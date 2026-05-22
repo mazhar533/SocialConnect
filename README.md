@@ -46,6 +46,10 @@ Connect with your friends instantly through personal chat channels.
 - **Shimmer Loaders**: Premium loading placeholders while database streams are fetching.
 - **Dark Mode Support**: Adapts beautifully to system-wide theme changes.
 
+### 7. 🔍 Search Functionality
+- **User-Only Search**: An integrated search bar is placed inside the `HomeHeader` of the Home Screen, above the user's greeting and profile details/image.
+- **Real-Time Prefix Matching**: Queries the Firebase Firestore `users` collection dynamically by checking if the name starts with the search query (prefix search). Clicking a search result navigates to that user's profile.
+
 ---
 
 ## 🗺️ Navigation & Screen Routes
@@ -57,7 +61,7 @@ All navigation flows are managed in `AppNavigation.kt` using Jetpack Compose Nav
 | `login` | `LoginScreen` | Direct email & password entry with login validation and navigation to Signup or Password Recovery. |
 | `signup` | `SignUpScreen` | Account registration including custom profile creation. |
 | `recovery` | `RecoveryScreen` | Triggers a Firebase password reset email flow. |
-| `home` | `HomeScreen` | Core feed displaying posts, with links to Profile, Chats, Notifications, and Post Details. |
+| `home` | `HomeScreen` | Core feed displaying posts, integrated Search bar in the header to query users by name, and links to Profile, Chats, Notifications, and Post Details. |
 | `notifications` | `NotificationScreen` | Central hub for likes, comments, follow alerts, follow requests (with Accept/Decline action buttons), and message routing. |
 | `create_post?postId={postId}` | `CreatePostScreen` | Handles both new post creation and editing existing posts (via optional `postId`). |
 | `profile?userId={userId}&showRequests={showRequests}` | `ProfileScreen` | Displays posts, follower counts, verification badge, follow request options, and private/public profile locking. |
