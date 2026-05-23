@@ -33,6 +33,42 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
 
+        val type = remoteMessage.data["type"]
+        val fromUserId = remoteMessage.data["fromUserId"]
+
+        // 1. Active Chat Suppression
+        if (type == "message" && fromUserId != null && fromUserId == com.mazhar.socialconnect.data.ActiveChatTracker.activeUserId) {
+            android.util.Log.d("FCM_SERVICE", "Active chat suppression triggered. Skipping notification for active chat target: $fromUserId")
+            return
+        }
+
+        // 2. Chat Notifications Toggle
+        if (type == "message") {
+            val chatNotificationsEnabled = prefs.getBoolean("chat_notifications", true)
+            if (!chatNotificationsEnabled) {
+                android.util.Log.d("FCM_SERVICE", "Chat notifications disabled in settings. Skipping FCM notification.")
+                return
+            }
+        }
+
+        // 3. Post Notifications Toggle
+        if (type in listOf("like", "comment", "share", "follow", "follow_request", "follow_accept")) {
+            val postNotificationsEnabled = prefs.getBoolean("post_notifications", true)
+            if (!postNotificationsEnabled) {
+                android.util.Log.d("FCM_SERVICE", "Post notifications disabled in settings. Skipping FCM notification.")
+                return
+            }
+        }
+
+        // 4. Muted Contact Suppression
+        if (fromUserId != null) {
+            val mutedChatsSet = prefs.getStringSet("muted_chats", emptySet()) ?: emptySet()
+            if (mutedChatsSet.contains(fromUserId)) {
+                android.util.Log.d("FCM_SERVICE", "Contact $fromUserId is muted. Skipping FCM notification.")
+                return
+            }
+        }
+
         remoteMessage.notification?.let {
             val title = it.title ?: "SocialConnect"
             val body = it.body ?: ""
@@ -41,8 +77,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val postContent = remoteMessage.data["postContent"]
             val postId = remoteMessage.data["postId"]
             val commentId = remoteMessage.data["commentId"]
-            val type = remoteMessage.data["type"]
-            val fromUserId = remoteMessage.data["fromUserId"]
             showNotification(title, body, imageUrl, userImage, postContent, postId, commentId, type, fromUserId)
         } ?: remoteMessage.data["title"]?.let { title ->
             val body = remoteMessage.data["body"] ?: ""
@@ -51,8 +85,6 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             val postContent = remoteMessage.data["postContent"]
             val postId = remoteMessage.data["postId"]
             val commentId = remoteMessage.data["commentId"]
-            val type = remoteMessage.data["type"]
-            val fromUserId = remoteMessage.data["fromUserId"]
             
             android.util.Log.d("FCM_SERVICE", "Showing custom notification: postId=$postId")
             

@@ -15,6 +15,9 @@ data class User(
     val following: List<String> = emptyList(),
     val fcmToken: String = "",
     var notificationsEnabled: Boolean = true,
+    var postNotificationsEnabled: Boolean = true,
+    var chatNotificationsEnabled: Boolean = true,
+    val mutedChats: List<String> = emptyList(),
     @get:PropertyName("isPrivate")
     @set:PropertyName("isPrivate")
     var isPrivate: Boolean = false,

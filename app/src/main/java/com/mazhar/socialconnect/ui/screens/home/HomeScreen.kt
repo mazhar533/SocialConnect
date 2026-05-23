@@ -38,6 +38,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.mazhar.socialconnect.ui.components.PostCardSkeleton
 import com.mazhar.socialconnect.ui.components.HomeHeaderSkeleton
 import com.mazhar.socialconnect.ui.components.CustomTextField
+import com.mazhar.socialconnect.ui.components.CustomToastManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -222,7 +223,7 @@ fun HomeScreen(
                                         .clickable {
                                             selectedPostForShare?.let { post ->
                                                 viewModel.sharePost(post, user.uid)
-                                                android.widget.Toast.makeText(context, "Post shared with ${user.name}", android.widget.Toast.LENGTH_SHORT).show()
+                                                CustomToastManager.success("Post shared with ${user.name}")
                                             }
                                             showShareSheet = false
                                         }

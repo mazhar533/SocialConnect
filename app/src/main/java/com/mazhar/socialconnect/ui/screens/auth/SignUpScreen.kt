@@ -4,6 +4,8 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mazhar.socialconnect.ui.components.CustomButton
 import com.mazhar.socialconnect.ui.components.CustomTextField
+import com.mazhar.socialconnect.ui.components.CustomToastManager
 import com.mazhar.socialconnect.ui.theme.*
 
 @Composable
@@ -46,11 +49,12 @@ fun SignUpScreen(
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
+                CustomToastManager.success("Account created successfully!")
                 viewModel.resetState()
                 onNavigateToHome()
             }
             is AuthState.Error -> {
-                Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_SHORT).show()
+                CustomToastManager.error((authState as AuthState.Error).message)
                 viewModel.resetState()
             }
             else -> {}
@@ -70,118 +74,128 @@ fun SignUpScreen(
                         Color(0xFFF9DDD6)
                     )
                 )
-            ),
+            )
+            .imePadding(),
         contentAlignment = Alignment.Center
     ) {
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .padding(vertical = 24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(32.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Column(
+            Card(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth(0.9f)
+                    .padding(vertical = 24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(32.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                // Logo placeholder
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AutoAwesome,
-                        contentDescription = "Logo",
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Join SocialConnect",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Discover what's happening\nright now.",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                CustomTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    placeholder = "Full Name",
-                    icon = Icons.Default.Person
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                CustomTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    placeholder = "Email Address",
-                    icon = Icons.Default.Email
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                CustomTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    placeholder = "Create Password",
-                    icon = Icons.Default.Lock,
-                    visualTransformation = PasswordVisualTransformation()
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                CustomButton(
-                    text = if (authState is AuthState.Loading) "Loading..." else "Sign Up",
-                    onClick = { viewModel.signUp(name, email, password) },
-                    enabled = authState !is AuthState.Loading,
-                    isPrimary = false // Sign up button was purple in design
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedButton(
-                    onClick = onNavigateToLogin,
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
-                    border = null,
-                    contentPadding = PaddingValues(0.dp)
+                        .padding(horizontal = 24.dp, vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Logo placeholder
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(16.dp)
-                            ),
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary),
                         contentAlignment = Alignment.Center
                     ) {
-                        Row {
-                            Text(text = "Already a member? ", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(text = "Log in", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = Icons.Outlined.AutoAwesome,
+                            contentDescription = "Logo",
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Join SocialConnect",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Discover what's happening\nright now.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    CustomTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        placeholder = "Full Name",
+                        icon = Icons.Default.Person
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    CustomTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "Email Address",
+                        icon = Icons.Default.Email
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    CustomTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = "Create Password",
+                        icon = Icons.Default.Lock,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    CustomButton(
+                        text = if (authState is AuthState.Loading) "Loading..." else "Sign Up",
+                        onClick = { viewModel.signUp(name, email, password) },
+                        enabled = authState !is AuthState.Loading,
+                        isPrimary = false // Sign up button was purple in design
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedButton(
+                        onClick = onNavigateToLogin,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
+                        border = null,
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(16.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row {
+                                Text(text = "Already a member? ", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = "Log in", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

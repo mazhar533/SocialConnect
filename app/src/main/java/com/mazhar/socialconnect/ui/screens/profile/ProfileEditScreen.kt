@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
@@ -31,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.mazhar.socialconnect.ui.components.ProfileEditSkeleton
+import com.mazhar.socialconnect.ui.components.CustomToastManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,7 +71,11 @@ fun ProfileEditScreen(
 
     LaunchedEffect(message) {
         message?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            if (it == "Profile updated successfully") {
+                CustomToastManager.success(it)
+            } else {
+                CustomToastManager.error(it)
+            }
             viewModel.clearMessage()
             if (it == "Profile updated successfully") {
                 onNavigateBack()
@@ -151,6 +158,7 @@ fun ProfileEditScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .navigationBarsPadding()
+                .imePadding()
         ) {
             if (loading && !hasPrefilled) {
                 ProfileEditSkeleton()
@@ -158,6 +166,7 @@ fun ProfileEditScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {

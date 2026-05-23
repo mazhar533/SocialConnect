@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -68,7 +69,18 @@ fun ChatDetailScreen(
 ) {
     val messages by viewModel.messages.collectAsState()
     val targetUserName by viewModel.targetUserName.collectAsState()
+    val targetUserId by viewModel.targetUserId.collectAsState()
+    val isChatMuted by viewModel.isChatMuted.collectAsState()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    
+    DisposableEffect(targetUserId) {
+        if (targetUserId != null) {
+            com.mazhar.socialconnect.data.ActiveChatTracker.activeUserId = targetUserId
+        }
+        onDispose {
+            com.mazhar.socialconnect.data.ActiveChatTracker.activeUserId = null
+        }
+    }
     var messageText by remember { mutableStateOf("") }
     val isTargetTyping by viewModel.isTargetTyping.collectAsState()
     var replyMessage by remember { mutableStateOf<Message?>(null) }
@@ -201,36 +213,55 @@ fun ChatDetailScreen(
                         }
                     }
 
-                    Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
-                        IconButton(onClick = { showMenu = !showMenu }) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isChatMuted) {
                             Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More options",
-                                tint = Color.White
+                                imageVector = Icons.Default.NotificationsOff,
+                                contentDescription = "Muted",
+                                tint = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(end = 8.dp)
                             )
                         }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Clear Chat") },
-                                onClick = {
-                                    showMenu = false
-                                    viewModel.clearChat(roomId)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (isBlockedByMe) "Unblock" else "Block") },
-                                onClick = {
-                                    showMenu = false
-                                    if (isBlockedByMe) {
-                                        viewModel.unblockUser(roomId)
-                                    } else {
-                                        viewModel.blockUser(roomId)
+                        Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
+                            IconButton(onClick = { showMenu = !showMenu }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More options",
+                                    tint = Color.White
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Clear Chat") },
+                                    onClick = {
+                                        showMenu = false
+                                        viewModel.clearChat(roomId)
                                     }
-                                }
-                            )
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (isBlockedByMe) "Unblock" else "Block") },
+                                    onClick = {
+                                        showMenu = false
+                                        if (isBlockedByMe) {
+                                            viewModel.unblockUser(roomId)
+                                        } else {
+                                            viewModel.blockUser(roomId)
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (isChatMuted) "Unmute Notifications" else "Mute Notifications") },
+                                    onClick = {
+                                        showMenu = false
+                                        viewModel.toggleMuteChat(roomId)
+                                    }
+                                )
+                            }
                         }
                     }
                 }

@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mazhar.socialconnect.ui.components.PostCard
 import com.google.firebase.auth.FirebaseAuth
+import com.mazhar.socialconnect.ui.components.CustomToastManager
 import android.widget.Toast
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material.icons.filled.Info
@@ -218,9 +219,9 @@ fun ProfileScreen(
                                              .clickable(enabled = !isEmailVerified) {
                                                  viewModel.sendEmailVerification { success, errorMsg ->
                                                      if (success) {
-                                                         Toast.makeText(context, "Verification email sent to $userEmail", Toast.LENGTH_LONG).show()
+                                                         CustomToastManager.success("Verification email sent to $userEmail")
                                                      } else {
-                                                         Toast.makeText(context, "Failed to send: $errorMsg", Toast.LENGTH_LONG).show()
+                                                         CustomToastManager.error("Failed to send: $errorMsg")
                                                      }
                                                  }
                                              },
@@ -701,7 +702,7 @@ fun ProfileScreen(
                                         .clickable {
                                             selectedPostForShare?.let { post ->
                                                 viewModel.sharePost(post, user.uid)
-                                                android.widget.Toast.makeText(context, "Post shared with ${user.name}", android.widget.Toast.LENGTH_SHORT).show()
+                                                CustomToastManager.success("Post shared with ${user.name}")
                                             }
                                             showShareSheet = false
                                         }

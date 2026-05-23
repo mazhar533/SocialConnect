@@ -18,6 +18,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Delete
@@ -52,6 +54,13 @@ fun ChatListScreen(
     val chatRooms by viewModel.chatRooms.collectAsState()
     val followingUsers by viewModel.followingUsers.collectAsState()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    val currentUserData by com.mazhar.socialconnect.data.UserRepository.currentUserData.collectAsState()
+    val mutedChats = currentUserData?.mutedChats ?: emptyList()
+
+    LaunchedEffect(Unit) {
+        com.mazhar.socialconnect.data.UserRepository.startListeningToCurrentUser()
+    }
+
     var roomToDelete by remember { mutableStateOf<ChatRoom?>(null) }
     var showDeleteWarningDialog by remember { mutableStateOf(false) }
 
@@ -166,9 +175,12 @@ fun ChatListScreen(
                         val targetName = room.participantNames[targetId] ?: "User"
                         val targetImage = room.participantImages[targetId] ?: ""
                         
+                        val isMuted = mutedChats.contains(targetId)
+                        
                         ChatRoomItem(
                             room = room,
                             currentUserId = currentUserId,
+                            isMuted = isMuted,
                             onClick = { onNavigateToChatDetail(room.id, targetName, targetImage) },
                             onDeleteClick = {
                                 roomToDelete = room
@@ -236,6 +248,7 @@ fun ChatListScreen(
 fun ChatRoomItem(
     room: ChatRoom, 
     currentUserId: String, 
+    isMuted: Boolean,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -276,8 +289,33 @@ fun ChatRoomItem(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(targetName, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, fontSize = 16.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = targetName,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontSize = 16.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (isMuted) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Default.NotificationsOff,
+                                contentDescription = "Muted",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                     Text(formatTime(room.lastMessageTimestamp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
                 Spacer(modifier = Modifier.height(4.dp))

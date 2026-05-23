@@ -49,6 +49,26 @@ exports.sendNotificationOnTrigger = onDocumentCreated("notifications/{notificati
             return;
         }
 
+        // 1b. Check specific notification settings (post/chat) and muted contacts list
+        if (type === "message") {
+            const chatNotificationsEnabled = userData.chatNotificationsEnabled !== false;
+            if (!chatNotificationsEnabled) {
+                console.log(`User ${targetUserId} has disabled chat notifications. Skipping FCM dispatch.`);
+                return;
+            }
+            const mutedChats = userData.mutedChats || [];
+            if (fromUserId && mutedChats.includes(fromUserId)) {
+                console.log(`User ${targetUserId} has muted chat notifications from ${fromUserId}. Skipping FCM dispatch.`);
+                return;
+            }
+        } else if (["like", "comment", "share", "follow", "follow_request", "follow_accept"].includes(type)) {
+            const postNotificationsEnabled = userData.postNotificationsEnabled !== false;
+            if (!postNotificationsEnabled) {
+                console.log(`User ${targetUserId} has disabled post notifications. Skipping FCM dispatch.`);
+                return;
+            }
+        }
+
         // 2. Retrieve FCM Token
         const targetToken = userData.fcmToken;
         if (!targetToken) {

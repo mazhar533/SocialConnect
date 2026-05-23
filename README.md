@@ -50,6 +50,12 @@ Connect with your friends instantly through personal chat channels.
 - **User-Only Search**: An integrated search bar is placed inside the `HomeHeader` of the Home Screen, above the user's greeting and profile details/image.
 - **Real-Time Prefix Matching**: Queries the Firebase Firestore `users` collection dynamically by checking if the name starts with the search query (prefix search). Clicking a search result navigates to that user's profile.
 
+### 8. 🔔 Granular Notification Control & Chat Muting
+- **Active Chat Suppression**: Automatically silences push notifications for incoming messages if the user is currently in the active chat details screen with that specific contact.
+- **Granular Settings Controls**: Separate "Post Notifications" and "Chat Notifications" toggle switches are nested under the general notifications toggle in the Settings screen.
+- **Individual Chat Muting**: Users can mute/unmute notifications for individual contacts directly via a toggle option in the three-dots dropdown menu inside each Chat details room.
+- **Server & Client Sync**: Updates settings synchronously in local `SharedPreferences` and securely in Firestore, ensuring correct client-side and Firebase Cloud Functions server-side filtering.
+
 ---
 
 ## 🗺️ Navigation & Screen Routes
@@ -66,7 +72,7 @@ All navigation flows are managed in `AppNavigation.kt` using Jetpack Compose Nav
 | `create_post?postId={postId}` | `CreatePostScreen` | Handles both new post creation and editing existing posts (via optional `postId`). |
 | `profile?userId={userId}&showRequests={showRequests}` | `ProfileScreen` | Displays posts, follower counts, verification badge, follow request options, and private/public profile locking. |
 | `profile_edit` | `ProfileEditScreen` | Modifies nickname, bio, and profile picture avatar. |
-| `settings` | `SettingsScreen` | Privacy options (Private Account switch), security settings (Change Email, Delete Account), and interactive FAQ cards. |
+| `settings` | `SettingsScreen` | Privacy options (Private Account switch), security settings (Change Email, Delete Account), Granular Notification Controls (Post & Chat toggles), and interactive FAQ cards. |
 | `chats` | `ChatListScreen` | Lists active conversations sorted by the latest message timestamp. |
 | `chat_detail?roomId={roomId}&userName={userName}&profileImage={profileImage}` | `ChatDetailScreen` | Real-time chat messages room with inline typing indicators, silent block actions, and selective clear options. |
 | `post_detail?postId={postId}&commentId={commentId}` | `PostDetailScreen` | View individual post details, likes, list of comments, and allows adding new comments. |

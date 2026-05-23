@@ -13,8 +13,10 @@ import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.mazhar.socialconnect.data.UserRepository
 
 class ChatDetailViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
@@ -34,6 +36,30 @@ class ChatDetailViewModel : ViewModel() {
 
     private val _isBlockedByMe = MutableStateFlow(false)
     val isBlockedByMe: StateFlow<Boolean> = _isBlockedByMe.asStateFlow()
+
+    private val _targetUserId = MutableStateFlow<String?>(null)
+    val targetUserId: StateFlow<String?> = _targetUserId.asStateFlow()
+
+    private val _isChatMuted = MutableStateFlow(false)
+    val isChatMuted: StateFlow<Boolean> = _isChatMuted.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            UserRepository.startListeningToCurrentUser()
+            combine(
+                UserRepository.currentUserData,
+                _targetUserId
+            ) { currentUser, targetId ->
+                if (currentUser != null && targetId != null) {
+                    currentUser.mutedChats.contains(targetId)
+                } else {
+                    false
+                }
+            }.collect { muted ->
+                _isChatMuted.value = muted
+            }
+        }
+    }
 
     private var messagesRegistration: ListenerRegistration? = null
     private var chatRoomRegistration: ListenerRegistration? = null
@@ -80,6 +106,7 @@ class ChatDetailViewModel : ViewModel() {
                 val roomSnap = firestore.collection("chatRooms").document(roomId).get().await()
                 val participants = roomSnap.get("participants") as? List<String> ?: emptyList()
                 val targetId = participants.firstOrNull { it != currentUserId }
+                _targetUserId.value = targetId
                 if (targetId != null) {
                     val userSnap = firestore.collection("users").document(targetId).get().await()
                     _targetUserProfileImage.value = userSnap.getString("profilePictureUrl")
@@ -110,6 +137,7 @@ class ChatDetailViewModel : ViewModel() {
                     
                     val targetId = participants.firstOrNull { it != currentUserId }
                     if (targetId != null) {
+                        _targetUserId.value = targetId
                         _targetUserName.value = names[targetId] ?: "Chat"
                         _isTargetTyping.value = typingMap[targetId] ?: false
                     }
@@ -374,6 +402,30 @@ class ChatDetailViewModel : ViewModel() {
             firestore.collection("notifications").document(notification.id).set(notification).await()
         } catch (_: Exception) {
             // Log error
+        }
+    }
+
+    fun toggleMuteChat(roomId: String) = viewModelScope.launch {
+        val currentUserId = auth.currentUser?.uid ?: return@launch
+        val targetId = _targetUserId.value ?: return@launch
+        val currentUser = UserRepository.currentUserData.value ?: return@launch
+
+        val isMuted = currentUser.mutedChats.contains(targetId)
+        val newMutedChats = if (isMuted) {
+            currentUser.mutedChats - targetId
+        } else {
+            currentUser.mutedChats + targetId
+        }
+
+        // Optimistically update local cache
+        UserRepository.updateCurrentUser(currentUser.copy(mutedChats = newMutedChats))
+
+        try {
+            firestore.collection("users").document(currentUserId)
+                .update("mutedChats", newMutedChats).await()
+        } catch (_: Exception) {
+            // Revert on error
+            UserRepository.updateCurrentUser(currentUser)
         }
     }
 }

@@ -3,6 +3,8 @@ package com.mazhar.socialconnect.ui.screens.auth
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mazhar.socialconnect.ui.components.CustomButton
 import com.mazhar.socialconnect.ui.components.CustomTextField
+import com.mazhar.socialconnect.ui.components.CustomToastManager
 import com.mazhar.socialconnect.ui.theme.*
 
 @Composable
@@ -40,12 +43,12 @@ fun RecoveryScreen(
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
-                Toast.makeText(context, "Recovery email sent!", Toast.LENGTH_SHORT).show()
+                CustomToastManager.success("Recovery link sent successfully!")
                 viewModel.resetState()
                 onNavigateBack()
             }
             is AuthState.Error -> {
-                Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_SHORT).show()
+                CustomToastManager.error((authState as AuthState.Error).message)
                 viewModel.resetState()
             }
             else -> {}
@@ -65,95 +68,105 @@ fun RecoveryScreen(
                         Color(0xFFF9DDD6)
                     )
                 )
-            ),
+            )
+            .imePadding(),
         contentAlignment = Alignment.Center
     ) {
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .padding(vertical = 24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(32.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Column(
+            Card(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth(0.9f)
+                    .padding(vertical = 24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(32.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                // Back button at top left
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    contentAlignment = Alignment.CenterStart
+                        .padding(horizontal = 24.dp, vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    IconButton(
-                        onClick = onNavigateBack,
+                    // Back button at top left
+                    Box(
                         modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                            .size(40.dp)
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                .size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    // Logo placeholder for Key
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.primary
+                            imageVector = Icons.Default.Key,
+                            contentDescription = "Key Icon",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(40.dp)
                         )
                     }
-                }
 
-                // Logo placeholder for Key
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = "Key Icon",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(40.dp)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Recovery",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Don't worry, happens to the best of\nus. Let's get you back in.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    CustomTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = "Enter your email",
+                        icon = Icons.Default.Email
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    CustomButton(
+                        text = if (authState is AuthState.Loading) "Sending..." else "SEND MAGIC LINK",
+                        onClick = { viewModel.recoverPassword(email) },
+                        enabled = authState !is AuthState.Loading,
+                        isPrimary = false // The button in design is very dark purple/black
                     )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Recovery",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Don't worry, happens to the best of\nus. Let's get you back in.",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                CustomTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    placeholder = "Enter your email",
-                    icon = Icons.Default.Email
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                CustomButton(
-                    text = if (authState is AuthState.Loading) "Sending..." else "SEND MAGIC LINK",
-                    onClick = { viewModel.recoverPassword(email) },
-                    enabled = authState !is AuthState.Loading,
-                    isPrimary = false // The button in design is very dark purple/black
-                )
             }
         }
     }

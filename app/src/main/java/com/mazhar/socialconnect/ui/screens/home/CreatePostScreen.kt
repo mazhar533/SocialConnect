@@ -30,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.mazhar.socialconnect.ui.theme.*
 import androidx.core.net.toUri
+import com.mazhar.socialconnect.ui.components.CustomToastManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +67,7 @@ fun CreatePostScreen(
 
     LaunchedEffect(postSuccess) {
         if (postSuccess) {
-            Toast.makeText(context, if (postId == null) "Post created successfully!" else "Post updated successfully!", Toast.LENGTH_SHORT).show()
+            CustomToastManager.success(if (postId == null) "Post created successfully!" else "Post updated successfully!")
             onNavigateBack()
             viewModel.resetState()
         }
@@ -74,7 +75,7 @@ fun CreatePostScreen(
 
     LaunchedEffect(error) {
         error?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            CustomToastManager.error(it)
             viewModel.resetState()
         }
     }

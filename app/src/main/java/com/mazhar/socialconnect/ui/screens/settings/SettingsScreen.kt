@@ -12,6 +12,8 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.ModeNight
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
@@ -34,7 +36,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import android.widget.Toast
+import com.mazhar.socialconnect.ui.components.CustomToastManager
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.filled.Delete
@@ -59,9 +61,12 @@ fun SettingsScreen(
     val viewModel = remember { SettingsViewModel(context) }
     
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
+    val postNotificationsEnabled by viewModel.postNotificationsEnabled.collectAsState()
+    val chatNotificationsEnabled by viewModel.chatNotificationsEnabled.collectAsState()
     val privateAccountEnabled by viewModel.privateAccountEnabled.collectAsState()
     val darkModeEnabled by viewModel.darkModeEnabled.collectAsState()
 
+    var isNotificationsExpanded by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEmailChangeDialog by remember { mutableStateOf(false) }
     var newEmailText by remember { mutableStateOf("") }
@@ -138,11 +143,52 @@ fun SettingsScreen(
                     SettingItem(
                         icon = Icons.Outlined.Notifications,
                         iconTint = MaterialTheme.colorScheme.secondary,
-                        title = "Notifications",
-                        subtitle = "Push, email, SMS alerts",
+                        title = "General Notifications",
+                        subtitle = "Enable or disable all notifications",
                         checked = notificationsEnabled,
-                        onCheckedChange = { viewModel.toggleNotifications(it) }
+                        onCheckedChange = { viewModel.toggleNotifications(it) },
+                        isExpandable = notificationsEnabled,
+                        isExpanded = isNotificationsExpanded,
+                        onExpandToggle = {
+                            if (notificationsEnabled) {
+                                isNotificationsExpanded = !isNotificationsExpanded
+                            }
+                        }
                     )
+                    if (notificationsEnabled && isNotificationsExpanded) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                            thickness = DividerDefaults.Thickness,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Row(modifier = Modifier.padding(start = 16.dp)) {
+                            SettingItem(
+                                icon = Icons.Outlined.FavoriteBorder,
+                                iconTint = Color(0xFFE91E63),
+                                title = "Post Notifications",
+                                subtitle = "Likes, comments, shares, follows",
+                                checked = postNotificationsEnabled,
+                                onCheckedChange = { viewModel.togglePostNotifications(it) },
+                                isSmall = true
+                            )
+                        }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                            thickness = DividerDefaults.Thickness,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Row(modifier = Modifier.padding(start = 16.dp)) {
+                            SettingItem(
+                                icon = Icons.Outlined.Email,
+                                iconTint = Color(0xFF2196F3),
+                                title = "Chat Notifications",
+                                subtitle = "Direct message push notifications",
+                                checked = chatNotificationsEnabled,
+                                onCheckedChange = { viewModel.toggleChatNotifications(it) },
+                                isSmall = true
+                            )
+                        }
+                    }
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 24.dp),
                         thickness = DividerDefaults.Thickness,
@@ -303,11 +349,11 @@ fun SettingsScreen(
                         showDeleteConfirmation = false
                         viewModel.deleteAccount(
                             onComplete = {
-                                Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_LONG).show()
+                                CustomToastManager.success("Account deleted successfully")
                                 onNavigateToLogin()
                             },
                             onError = { errorMessage ->
-                                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                                CustomToastManager.error(errorMessage)
                             }
                         )
                     },
@@ -359,21 +405,21 @@ fun SettingsScreen(
                     onClick = {
                         val email = newEmailText.trim()
                         if (email.isEmpty()) {
-                            Toast.makeText(context, "Email cannot be empty", Toast.LENGTH_SHORT).show()
+                            CustomToastManager.error("Email cannot be empty")
                             return@TextButton
                         }
                         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                            Toast.makeText(context, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
+                            CustomToastManager.error("Please enter a valid email address")
                             return@TextButton
                         }
                         showEmailChangeDialog = false
                         viewModel.changeEmail(
                             newEmail = email,
                             onComplete = {
-                                Toast.makeText(context, "Verification link sent to new email. Please verify to complete update.", Toast.LENGTH_LONG).show()
+                                CustomToastManager.success("Verification link sent! Verify to complete update.")
                             },
                             onError = { error ->
-                                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                                CustomToastManager.error(error)
                             }
                         )
                     }
@@ -399,26 +445,66 @@ fun SettingItem(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    isExpandable: Boolean = false,
+    isExpanded: Boolean = false,
+    onExpandToggle: (() -> Unit)? = null,
+    isSmall: Boolean = false
 ) {
+    val verticalPadding = if (isSmall) 8.dp else 16.dp
+    val boxSize = if (isSmall) 36.dp else 48.dp
+    val titleSize = if (isSmall) 14.sp else 16.sp
+    val subtitleSize = if (isSmall) 11.sp else 12.sp
+    val iconSize = if (isSmall) 18.dp else 24.dp
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .then(
+                if (isExpandable && onExpandToggle != null) {
+                    Modifier.clickable { onExpandToggle() }
+                } else {
+                    Modifier
+                }
+            )
+            .padding(horizontal = 24.dp, vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(boxSize)
                 .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = title, tint = iconTint)
+            Icon(
+                icon, 
+                contentDescription = title, 
+                tint = iconTint, 
+                modifier = if (isSmall) Modifier.size(iconSize) else Modifier
+            )
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
-            Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    title, 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = titleSize, 
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                if (isExpandable && onExpandToggle != null) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Text(subtitle, fontSize = subtitleSize, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(
             checked = checked,

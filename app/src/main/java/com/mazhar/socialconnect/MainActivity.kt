@@ -11,11 +11,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.mazhar.socialconnect.ui.navigation.AppNavigation
 import com.mazhar.socialconnect.ui.theme.SocialConnectTheme
+import com.mazhar.socialconnect.ui.components.CustomToastOverlay
 import kotlinx.coroutines.flow.MutableStateFlow
 import android.Manifest
 import android.content.pm.PackageManager
@@ -77,18 +79,21 @@ class MainActivity : ComponentActivity() {
             
             SocialConnectTheme(darkTheme = isDarkMode, dynamicColor = false) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppNavigation(
-                        initialPostId = postId, 
-                        initialCommentId = commentId,
-                        initialNotificationType = notificationType,
-                        initialFromUserId = fromUserId,
-                        onNavigationHandled = {
-                            initialPostId.value = null
-                            initialCommentId.value = null
-                            initialNotificationType.value = null
-                            initialFromUserId.value = null
-                        }
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AppNavigation(
+                            initialPostId = postId, 
+                            initialCommentId = commentId,
+                            initialNotificationType = notificationType,
+                            initialFromUserId = fromUserId,
+                            onNavigationHandled = {
+                                initialPostId.value = null
+                                initialCommentId.value = null
+                                initialNotificationType.value = null
+                                initialFromUserId.value = null
+                            }
+                        )
+                        CustomToastOverlay()
+                    }
                 }
             }
         }

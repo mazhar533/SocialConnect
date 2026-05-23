@@ -21,6 +21,12 @@ class SettingsViewModel(context: Context) : ViewModel() {
     private val _notificationsEnabled = MutableStateFlow(prefs.getBoolean("notifications", true))
     val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
 
+    private val _postNotificationsEnabled = MutableStateFlow(prefs.getBoolean("post_notifications", true))
+    val postNotificationsEnabled: StateFlow<Boolean> = _postNotificationsEnabled.asStateFlow()
+
+    private val _chatNotificationsEnabled = MutableStateFlow(prefs.getBoolean("chat_notifications", true))
+    val chatNotificationsEnabled: StateFlow<Boolean> = _chatNotificationsEnabled.asStateFlow()
+
     private val _privateAccountEnabled = MutableStateFlow(prefs.getBoolean("privateAccount", false))
     val privateAccountEnabled: StateFlow<Boolean> = _privateAccountEnabled.asStateFlow()
 
@@ -42,6 +48,12 @@ class SettingsViewModel(context: Context) : ViewModel() {
                     _notificationsEnabled.value = user.notificationsEnabled
                     prefs.edit().putBoolean("notifications", user.notificationsEnabled).apply()
 
+                    _postNotificationsEnabled.value = user.postNotificationsEnabled
+                    prefs.edit().putBoolean("post_notifications", user.postNotificationsEnabled).apply()
+
+                    _chatNotificationsEnabled.value = user.chatNotificationsEnabled
+                    prefs.edit().putBoolean("chat_notifications", user.chatNotificationsEnabled).apply()
+
                     _privateAccountEnabled.value = user.isPrivate
                     prefs.edit().putBoolean("privateAccount", user.isPrivate).apply()
                 }
@@ -60,6 +72,32 @@ class SettingsViewModel(context: Context) : ViewModel() {
             } catch (e: Exception) {
                 // Handle error
             }
+        }
+    }
+
+    fun togglePostNotifications(enabled: Boolean) {
+        _postNotificationsEnabled.value = enabled
+        prefs.edit().putBoolean("post_notifications", enabled).apply()
+        
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                firestore.collection("users").document(uid)
+                    .update("postNotificationsEnabled", enabled).await()
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun toggleChatNotifications(enabled: Boolean) {
+        _chatNotificationsEnabled.value = enabled
+        prefs.edit().putBoolean("chat_notifications", enabled).apply()
+        
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                firestore.collection("users").document(uid)
+                    .update("chatNotificationsEnabled", enabled).await()
+            } catch (_: Exception) {}
         }
     }
 

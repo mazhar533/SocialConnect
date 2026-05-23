@@ -45,7 +45,23 @@ object UserRepository {
                     return@addSnapshotListener
                 }
                 if (snapshot != null && snapshot.exists()) {
-                    _currentUserData.value = snapshot.toObject(User::class.java)
+                    val user = snapshot.toObject(User::class.java)
+                    _currentUserData.value = user
+                    if (user != null) {
+                        try {
+                            val context = com.google.firebase.FirebaseApp.getInstance().applicationContext
+                            val prefs = context.getSharedPreferences("settings_prefs", android.content.Context.MODE_PRIVATE)
+                            prefs.edit().apply {
+                                putBoolean("notifications", user.notificationsEnabled)
+                                putBoolean("post_notifications", user.postNotificationsEnabled)
+                                putBoolean("chat_notifications", user.chatNotificationsEnabled)
+                                putStringSet("muted_chats", user.mutedChats.toSet())
+                                apply()
+                            }
+                        } catch (ex: Exception) {
+                            android.util.Log.e("UserRepository", "Error caching user settings: ${ex.message}")
+                        }
+                    }
                 }
             }
     }
@@ -72,5 +88,10 @@ object UserRepository {
         cleanupListener()
         activeUid = null
         _currentUserData.value = null
+        try {
+            val context = com.google.firebase.FirebaseApp.getInstance().applicationContext
+            val prefs = context.getSharedPreferences("settings_prefs", android.content.Context.MODE_PRIVATE)
+            prefs.edit().clear().apply()
+        } catch (_: Exception) {}
     }
 }
